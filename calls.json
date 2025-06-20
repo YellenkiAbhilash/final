@@ -105,8 +105,21 @@
       "phone": "+919876543210",
       "time": "2025-06-20T11:55:33.000Z",
       "completed": false,
-      "failed": false,
-      "created_at": "2025-06-20T11:54:33.629Z"
+      "failed": true,
+      "created_at": "2025-06-20T11:54:33.629Z",
+      "failed_at": "2025-06-20T11:56:24.309Z",
+      "error": "Url is not a valid URL: http://localhost:3000/twiml/ask"
+    },
+    {
+      "id": "test-ist-1750420999835",
+      "name": "IST Test User - Current Time",
+      "phone": "+919876543210",
+      "time": "2025-06-20T12:04:19.000Z",
+      "completed": false,
+      "failed": true,
+      "created_at": "2025-06-20T12:03:19.835Z",
+      "failed_at": "2025-06-20T12:04:24.878Z",
+      "error": "Url is not a valid URL: http://localhost:3000/twiml/ask"
     }
   ]
 }
