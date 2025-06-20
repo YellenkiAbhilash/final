@@ -538,17 +538,17 @@ setInterval(async () => {
     }
     
     const callsData = loadCalls();
-    // Use IST timezone (UTC+5:30)
+    // Use IST timezone properly
     const now = new Date();
-    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Add 5:30 hours for IST
-    console.log(`\n🕐 Scheduler check at ${istTime.toISOString()} (IST: ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
+    const istTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    console.log(`\n🕐 Scheduler check at ${now.toISOString()} (IST: ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
     console.log(`   Total calls: ${callsData.calls.length}`);
     
     let updated = false;
 
     for (const call of callsData.calls) {
         const callTime = new Date(call.time);
-        const callTimeIST = new Date(callTime.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
+        const callTimeIST = new Date(callTime.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
         const timeDiff = callTimeIST - istTime;
         const minutesUntilCall = Math.floor(timeDiff / (1000 * 60));
         
