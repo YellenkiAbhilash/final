@@ -5,7 +5,7 @@ const callsData = JSON.parse(fs.readFileSync('calls.json', 'utf8'));
 
 // Create a call scheduled for current IST time (add 2 minutes to ensure it's in the future)
 const now = new Date();
-const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
+const istTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 const scheduledTime = new Date(istTime.getTime() + 2 * 60 * 1000); // Add 2 minutes
 
 const testCall = {

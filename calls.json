@@ -67,7 +67,10 @@
       "name": "Immediate Test Call",
       "phone": "+91 8008162349",
       "time": "2025-06-20T11:35:00.000Z",
-      "created_at": "2025-06-20T11:30:30.000Z"
+      "created_at": "2025-06-20T11:30:30.000Z",
+      "failed": true,
+      "failed_at": "2025-06-20T11:35:24.195Z",
+      "error": "Url is not a valid URL: http://localhost:3000/twiml/ask"
     },
     {
       "id": "test-1750419245682",

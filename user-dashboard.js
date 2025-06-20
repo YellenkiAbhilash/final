@@ -276,8 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const callsList = data.calls.map(call => {
                             // Format the time for display (IST)
                             const callTime = new Date(call.time);
-                            const istTime = new Date(callTime.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
-                            const formattedTime = istTime.toLocaleString('en-IN', { 
+                            const formattedTime = callTime.toLocaleString('en-IN', { 
                                 timeZone: 'Asia/Kolkata',
                                 year: 'numeric',
                                 month: 'short',

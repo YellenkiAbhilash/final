@@ -18,7 +18,7 @@ function testScheduler() {
     
     const callsData = loadCalls();
     const now = new Date();
-    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
+    const istTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     
     console.log(`Current time (UTC): ${now.toISOString()}`);
     console.log(`Current time (IST): ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
@@ -26,7 +26,7 @@ function testScheduler() {
     
     callsData.calls.forEach((call, index) => {
         const callTime = new Date(call.time);
-        const callTimeIST = new Date(callTime.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
+        const callTimeIST = new Date(callTime.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
         const timeDiff = callTimeIST - istTime;
         const minutesUntilCall = Math.floor(timeDiff / (1000 * 60));
         const isDue = callTimeIST <= istTime;
@@ -70,7 +70,7 @@ function createTestCall() {
     
     // Create a call scheduled for current IST time (add 1 minute to ensure it's in the future)
     const now = new Date();
-    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
+    const istTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     const scheduledTime = new Date(istTime.getTime() + 1 * 60 * 1000); // Add 1 minute
     
     const testCall = {
