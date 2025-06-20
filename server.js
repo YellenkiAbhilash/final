@@ -530,7 +530,7 @@ setInterval(async () => {
         if (!call.completed && new Date(call.time) <= now) {
             try {
                 await twilioClient.calls.create({
-                    url: 'https://your-render-app-name.onrender.com/twiml/ask',
+                    url: 'https://js-ue5o.onrender.com/twiml/ask',
                     to: call.phone,
                     from: TWILIO_PHONE_NUMBER
                 });
