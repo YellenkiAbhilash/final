@@ -120,6 +120,15 @@
       "created_at": "2025-06-20T12:03:19.835Z",
       "failed_at": "2025-06-20T12:04:24.878Z",
       "error": "Url is not a valid URL: http://localhost:3000/twiml/ask"
+    },
+    {
+      "id": "test-ist-1750421590251",
+      "name": "IST Test User - Fixed Timezone",
+      "phone": "+919876543210",
+      "time": "2025-06-20T17:44:10.251Z",
+      "completed": false,
+      "failed": false,
+      "created_at": "2025-06-20T12:13:10.252Z"
     }
   ]
 }

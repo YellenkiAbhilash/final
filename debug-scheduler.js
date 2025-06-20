@@ -17,7 +17,9 @@ function debugScheduler() {
     
     const callsData = loadCalls();
     const now = new Date();
-    const istTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    // Get IST offset (UTC+5:30 = 5.5 hours)
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
+    const istTime = new Date(now.getTime() + istOffset);
     
     console.log(`⏰ Current time (UTC): ${now.toISOString()}`);
     console.log(`⏰ Current time (IST): ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
@@ -29,7 +31,8 @@ function debugScheduler() {
     
     callsData.calls.forEach((call, index) => {
         const callTime = new Date(call.time);
-        const callTimeIST = new Date(callTime.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        // Convert call time to IST
+        const callTimeIST = new Date(callTime.getTime() + istOffset);
         const timeDiff = callTimeIST - istTime;
         const minutesUntilCall = Math.floor(timeDiff / (1000 * 60));
         const isDue = callTimeIST <= istTime;
