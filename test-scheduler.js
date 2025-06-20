@@ -14,22 +14,25 @@ function loadCalls() {
 
 // Test the scheduler logic
 function testScheduler() {
-    console.log('🧪 Testing Scheduler Logic\n');
+    console.log('🧪 Testing Scheduler Logic (IST TIMEZONE)\n');
     
     const callsData = loadCalls();
     const now = new Date();
+    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
     
-    console.log(`Current time: ${now.toISOString()}`);
+    console.log(`Current time (UTC): ${now.toISOString()}`);
+    console.log(`Current time (IST): ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
     console.log(`Total calls: ${callsData.calls.length}\n`);
     
     callsData.calls.forEach((call, index) => {
         const callTime = new Date(call.time);
-        const timeDiff = callTime - now;
+        const callTimeIST = new Date(callTime.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
+        const timeDiff = callTimeIST - istTime;
         const minutesUntilCall = Math.floor(timeDiff / (1000 * 60));
-        const isDue = callTime <= now;
+        const isDue = callTimeIST <= istTime;
         
         console.log(`Call ${call.id}: ${call.name} (${call.phone})`);
-        console.log(`  Scheduled: ${callTime.toISOString()}`);
+        console.log(`  Scheduled (IST): ${callTimeIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
         console.log(`  Status: ${call.completed ? '✅ Completed' : call.failed ? '❌ Failed' : '⏳ Pending'}`);
         console.log(`  Time until call: ${minutesUntilCall} minutes`);
         console.log(`  Is due: ${isDue ? '✅ YES' : '⏰ NO'}`);
@@ -55,4 +58,41 @@ function testScheduler() {
 }
 
 // Run the test
-testScheduler(); 
+testScheduler();
+
+// Test script to create a call scheduled for current IST time
+function saveCalls(callsData) {
+    fs.writeFileSync('calls.json', JSON.stringify(callsData, null, 2));
+}
+
+function createTestCall() {
+    const callsData = loadCalls();
+    
+    // Create a call scheduled for current IST time (add 1 minute to ensure it's in the future)
+    const now = new Date();
+    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
+    const scheduledTime = new Date(istTime.getTime() + 1 * 60 * 1000); // Add 1 minute
+    
+    const testCall = {
+        id: `test-${Date.now()}`,
+        name: 'Test User IST',
+        phone: '+919876543210', // Replace with a real number for testing
+        time: scheduledTime.toISOString(),
+        completed: false,
+        failed: false,
+        created_at: new Date().toISOString()
+    };
+    
+    callsData.calls.push(testCall);
+    saveCalls(callsData);
+    
+    console.log('🧪 TEST CALL CREATED FOR IST TIME');
+    console.log(`📞 Name: ${testCall.name}`);
+    console.log(`📱 Phone: ${testCall.phone}`);
+    console.log(`⏰ Scheduled (IST): ${scheduledTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+    console.log(`🆔 Call ID: ${testCall.id}`);
+    console.log('\n✅ The scheduler will make this call in about 1 minute!');
+    console.log('   Make sure Twilio is configured in your .env file.');
+}
+
+createTestCall(); 

@@ -538,22 +538,25 @@ setInterval(async () => {
     }
     
     const callsData = loadCalls();
+    // Use IST timezone (UTC+5:30)
     const now = new Date();
-    console.log(`\n🕐 Scheduler check at ${now.toISOString()}`);
+    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Add 5:30 hours for IST
+    console.log(`\n🕐 Scheduler check at ${istTime.toISOString()} (IST: ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
     console.log(`   Total calls: ${callsData.calls.length}`);
     
     let updated = false;
 
     for (const call of callsData.calls) {
         const callTime = new Date(call.time);
-        const timeDiff = callTime - now;
+        const callTimeIST = new Date(callTime.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
+        const timeDiff = callTimeIST - istTime;
         const minutesUntilCall = Math.floor(timeDiff / (1000 * 60));
         
-        console.log(`   Call ${call.id}: ${call.name} (${call.phone}) - Scheduled: ${callTime.toISOString()}`);
+        console.log(`   Call ${call.id}: ${call.name} (${call.phone}) - Scheduled: ${callTimeIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
         console.log(`     Status: ${call.completed ? '✅ Completed' : call.failed ? '❌ Failed' : '⏳ Pending'}`);
         console.log(`     Time until call: ${minutesUntilCall} minutes`);
         
-        if (!call.completed && !call.failed && callTime <= now) {
+        if (!call.completed && !call.failed && callTimeIST <= istTime) {
             console.log(`   🚀 Making call to ${call.name} (${call.phone})`);
             try {
                 // Use a public URL for Twilio (you'll need to deploy this or use ngrok)
@@ -787,6 +790,7 @@ app.post('/api/trigger-call/:callId', authenticateToken, async (req, res) => {
         const publicUrl = process.env.PUBLIC_URL || 'https://hr-automate.onrender.com';
         const twimlUrl = `${publicUrl}/twiml/ask`;
         console.log(`Manually triggering call to ${call.name} (${call.phone}) at ${twimlUrl}`);
+        console.log(`IST Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
         
         await twilioClient.calls.create({
             url: twimlUrl,

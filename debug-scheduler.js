@@ -13,12 +13,14 @@ function loadCalls() {
 
 // Simulate the exact scheduler logic
 function debugScheduler() {
-    console.log('🔍 SCHEDULER DEBUG - LIVE ANALYSIS\n');
+    console.log('🔍 SCHEDULER DEBUG - LIVE ANALYSIS (IST TIMEZONE)\n');
     
     const callsData = loadCalls();
     const now = new Date();
+    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Add 5:30 hours for IST
     
-    console.log(`⏰ Current time: ${now.toISOString()}`);
+    console.log(`⏰ Current time (UTC): ${now.toISOString()}`);
+    console.log(`⏰ Current time (IST): ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
     console.log(`📞 Total calls in system: ${callsData.calls.length}\n`);
     
     let pendingCalls = [];
@@ -27,12 +29,13 @@ function debugScheduler() {
     
     callsData.calls.forEach((call, index) => {
         const callTime = new Date(call.time);
-        const timeDiff = callTime - now;
+        const callTimeIST = new Date(callTime.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
+        const timeDiff = callTimeIST - istTime;
         const minutesUntilCall = Math.floor(timeDiff / (1000 * 60));
-        const isDue = callTime <= now;
+        const isDue = callTimeIST <= istTime;
         
         console.log(`📋 Call ${call.id}: ${call.name} (${call.phone})`);
-        console.log(`   📅 Scheduled: ${callTime.toISOString()}`);
+        console.log(`   📅 Scheduled (IST): ${callTimeIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
         console.log(`   ⏱️  Time until call: ${minutesUntilCall} minutes`);
         console.log(`   🎯 Is due: ${isDue ? '✅ YES' : '⏰ NO'}`);
         

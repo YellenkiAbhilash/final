@@ -274,19 +274,28 @@ document.addEventListener('DOMContentLoaded', function() {
                         infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content'>You have no scheduled calls.</div>`;
                     } else {
                         const callsList = data.calls.map(call => {
-                            const status = call.completed ? 
-                                `<span style="color: #10b981;">✓ Completed</span>` : 
-                                call.failed ? 
-                                    `<span style="color: #ef4444;">✗ Failed</span>` :
-                                    `<span style="color: #f59e0b;">⏳ Pending</span>`;
+                            // Format the time for display (IST)
+                            const callTime = new Date(call.time);
+                            const istTime = new Date(callTime.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
+                            const formattedTime = istTime.toLocaleString('en-IN', { 
+                                timeZone: 'Asia/Kolkata',
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                            
+                            const status = call.completed ? 'Completed' : call.failed ? 'Failed' : 'Pending';
+                            const statusClass = call.completed ? 'completed' : call.failed ? 'failed' : 'pending';
                             
                             const triggerBtn = !call.completed && !call.failed ? 
                                 `<button onclick="triggerCall(${call.id})" style="background: #667eea; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem; cursor: pointer; margin-left: 0.5rem;">Trigger Now</button>` : '';
                             
                             return `<li style="margin-bottom: 1rem; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 8px;">
                                 <strong>${call.name}</strong> (${call.phone})<br>
-                                ${new Date(call.time).toLocaleString()}<br>
-                                Status: ${status} ${triggerBtn}
+                                ${formattedTime}<br>
+                                Status: <span class="${statusClass}">${status}</span> ${triggerBtn}
                             </li>`;
                         }).join('');
                         infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content'><ul style="list-style: none; padding: 0;">${callsList}</ul></div>`;
