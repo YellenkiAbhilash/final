@@ -694,6 +694,68 @@ app.post('/twiml/ask', express.urlencoded({ extended: false }), (req, res) => {
     res.send(response.toString());
 });
 
+// Direct call endpoint - make call immediately
+app.post('/api/direct-call', authenticateToken, async (req, res) => {
+    if (!twilioClient) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Twilio client not configured' 
+        });
+    }
+    
+    const { name, phone } = req.body;
+    if (!name || !phone) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Name and phone number are required.' 
+        });
+    }
+    
+    try {
+        const publicUrl = process.env.PUBLIC_URL || 'https://hr-automate.onrender.com';
+        const twimlUrl = `${publicUrl}/twiml/ask`;
+        console.log(`Making direct call to ${name} (${phone}) at ${twimlUrl}`);
+        
+        // Make the call immediately
+        const call = await twilioClient.calls.create({
+            url: twimlUrl,
+            to: phone,
+            from: TWILIO_PHONE_NUMBER
+        });
+        
+        // Save call record for tracking
+        const callsData = loadCalls();
+        const newCall = {
+            id: callsData.calls.length + 1,
+            userId: req.user.userId,
+            name,
+            phone,
+            time: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            completed: true,
+            completed_at: new Date().toISOString(),
+            direct_call: true,
+            twilio_call_sid: call.sid
+        };
+        callsData.calls.push(newCall);
+        saveCalls(callsData);
+        
+        console.log(`Direct call made successfully to ${name} (${phone})`);
+        
+        res.json({ 
+            success: true, 
+            message: 'Call initiated successfully!',
+            call: newCall
+        });
+    } catch (err) {
+        console.error('Error making direct call:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to make call: ' + err.message 
+        });
+    }
+});
+
 // Manual call trigger for testing (admin only)
 app.post('/api/trigger-call/:callId', authenticateToken, async (req, res) => {
     if (!twilioClient) {

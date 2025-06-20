@@ -396,6 +396,169 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Direct Call button functionality
+    document.getElementById('directCallBtn').addEventListener('click', function() {
+        showDirectCallModal();
+    });
+
+    // Function to show direct call modal
+    function showDirectCallModal() {
+        // Create modal HTML
+        const modalHTML = `
+            <div id="directCallModal" class="modal-overlay" style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            ">
+                <div class="modal-content" style="
+                    background: white;
+                    padding: 2rem;
+                    border-radius: 12px;
+                    max-width: 400px;
+                    width: 90%;
+                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h2 style="margin: 0; color: #1f2937; font-size: 1.5rem;">
+                            <i class="fas fa-phone" style="color: #10b981; margin-right: 0.5rem;"></i>
+                            Make Direct Call
+                        </h2>
+                        <button id="closeDirectCallModal" style="
+                            background: none;
+                            border: none;
+                            font-size: 1.5rem;
+                            cursor: pointer;
+                            color: #6b7280;
+                        ">&times;</button>
+                    </div>
+                    
+                    <form id="directCallForm">
+                        <div style="margin-bottom: 1rem;">
+                            <label for="directCallName" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Name</label>
+                            <input type="text" id="directCallName" required style="
+                                width: 100%;
+                                padding: 0.75rem;
+                                border: 1px solid #d1d5db;
+                                border-radius: 8px;
+                                font-size: 1rem;
+                                box-sizing: border-box;
+                            " placeholder="Enter name">
+                        </div>
+                        
+                        <div style="margin-bottom: 1.5rem;">
+                            <label for="directCallPhone" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Phone Number</label>
+                            <input type="tel" id="directCallPhone" required style="
+                                width: 100%;
+                                padding: 0.75rem;
+                                border: 1px solid #d1d5db;
+                                border-radius: 8px;
+                                font-size: 1rem;
+                                box-sizing: border-box;
+                            " placeholder="+1234567890" pattern="[0-9\\-\\+\\s\\(\\)]{7,}">
+                            <small style="color: #6b7280; font-size: 0.875rem;">Include country code (e.g., +1 for US)</small>
+                        </div>
+                        
+                        <div style="display: flex; gap: 1rem;">
+                            <button type="submit" style="
+                                flex: 1;
+                                background: #10b981;
+                                color: white;
+                                border: none;
+                                padding: 0.75rem;
+                                border-radius: 8px;
+                                font-size: 1rem;
+                                font-weight: 600;
+                                cursor: pointer;
+                            ">
+                                <i class="fas fa-phone" style="margin-right: 0.5rem;"></i>
+                                Make Call
+                            </button>
+                            <button type="button" id="cancelDirectCall" style="
+                                flex: 1;
+                                background: #6b7280;
+                                color: white;
+                                border: none;
+                                padding: 0.75rem;
+                                border-radius: 8px;
+                                font-size: 1rem;
+                                font-weight: 600;
+                                cursor: pointer;
+                            ">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        // Add event listeners
+        document.getElementById('closeDirectCallModal').addEventListener('click', closeDirectCallModal);
+        document.getElementById('cancelDirectCall').addEventListener('click', closeDirectCallModal);
+        document.getElementById('directCallForm').addEventListener('submit', handleDirectCall);
+        
+        // Close modal when clicking outside
+        document.getElementById('directCallModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDirectCallModal();
+            }
+        });
+    }
+    
+    // Function to close direct call modal
+    function closeDirectCallModal() {
+        const modal = document.getElementById('directCallModal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+    
+    // Function to handle direct call submission
+    async function handleDirectCall(e) {
+        e.preventDefault();
+        
+        const name = document.getElementById('directCallName').value.trim();
+        const phone = document.getElementById('directCallPhone').value.trim();
+        
+        if (!name || !phone) {
+            showNotification('Please fill in all fields', 'error');
+            return;
+        }
+        
+        try {
+            // Create a call record for immediate execution
+            const response = await fetch('/api/direct-call', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ name, phone })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                showNotification('Call initiated successfully!', 'success');
+                closeDirectCallModal();
+            } else {
+                showNotification(data.message || 'Failed to make call', 'error');
+            }
+        } catch (err) {
+            showNotification('Network error. Please try again.', 'error');
+        }
+    }
+
     // Function to trigger a call manually
     window.triggerCall = async function(callId) {
         try {
