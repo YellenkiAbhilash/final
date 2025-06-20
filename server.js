@@ -502,24 +502,42 @@ app.post('/api/schedule-call', authenticateToken, (req, res) => {
     if (!name || !phone || !time) {
         return res.status(400).json({ success: false, message: 'All fields are required.' });
     }
-    const usersData = loadUsers();
-    const user = usersData.users.find(u => u.id === req.user.userId);
-    if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found.' });
+    
+    try {
+        const usersData = loadUsers();
+        const user = usersData.users.find(u => u.id === req.user.userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+        
+        const callsData = loadCalls();
+        const newCall = {
+            id: callsData.calls.length + 1,
+            userId: user.id,
+            name,
+            phone,
+            time,
+            status: 'Scheduled',
+            created_at: new Date().toISOString()
+        };
+        
+        callsData.calls.push(newCall);
+        console.log('Writing to calls.json at:', callsFile);
+        saveCalls(callsData);
+        
+        // Schedule the call using the scheduler
+        const jobId = callScheduler.scheduleCall(newCall);
+        
+        res.json({ 
+            success: true, 
+            message: 'Call scheduled successfully.', 
+            call: newCall,
+            jobId: jobId
+        });
+    } catch (error) {
+        console.error('Error scheduling call:', error);
+        res.status(500).json({ success: false, message: 'Failed to schedule call' });
     }
-    const callsData = loadCalls();
-    const newCall = {
-        id: callsData.calls.length + 1,
-        userId: user.id,
-        name,
-        phone,
-        time,
-        created_at: new Date().toISOString()
-    };
-    callsData.calls.push(newCall);
-    console.log('Writing to calls.json at:', callsFile); // Debug log
-    saveCalls(callsData);
-    res.json({ success: true, message: 'Call scheduled successfully.', call: newCall });
 });
 
 // Get all scheduled calls for the logged-in user
@@ -529,73 +547,237 @@ app.get('/api/scheduled-calls', authenticateToken, (req, res) => {
     res.json({ success: true, calls: userCalls });
 });
 
-// Add background scheduler before app.listen
-setInterval(async () => {
-    if (!twilioClient) {
-        console.log('⚠️  Twilio client not available, skipping call scheduler');
-        console.log('   To fix this, create a .env file with your Twilio credentials');
-        return;
+// Improved scheduler with job management
+class CallScheduler {
+    constructor(twilioClient, twilioPhoneNumber) {
+        this.twilioClient = twilioClient;
+        this.twilioPhoneNumber = twilioPhoneNumber;
+        this.scheduledJobs = new Map(); // Store job references
+        this.isRunning = false;
+        this.checkInterval = null;
     }
-    
-    const callsData = loadCalls();
-    // Use IST timezone properly - get current time in IST
-    const now = new Date();
-    // Get IST offset (UTC+5:30 = 5.5 hours)
-    const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
-    const istTime = new Date(now.getTime() + istOffset);
-    console.log(`\n🕐 Scheduler check at ${now.toISOString()} (IST: ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
-    console.log(`   Total calls: ${callsData.calls.length}`);
-    
-    let updated = false;
 
-    for (const call of callsData.calls) {
-        const callTime = new Date(call.time);
-        // Convert call time to IST
-        const callTimeIST = new Date(callTime.getTime() + istOffset);
-        const timeDiff = callTimeIST - istTime;
-        const minutesUntilCall = Math.floor(timeDiff / (1000 * 60));
+    start() {
+        if (this.isRunning) return;
         
-        console.log(`   Call ${call.id}: ${call.name} (${call.phone}) - Scheduled: ${callTimeIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
-        console.log(`     Status: ${call.completed ? '✅ Completed' : call.failed ? '❌ Failed' : '⏳ Pending'}`);
-        console.log(`     Time until call: ${minutesUntilCall} minutes`);
+        this.isRunning = true;
+        console.log('🚀 Call Scheduler started');
         
-        if (!call.completed && !call.failed && callTimeIST <= istTime) {
-            console.log(`   🚀 Making call to ${call.name} (${call.phone})`);
-            try {
-                // Use a public URL for Twilio (you'll need to deploy this or use ngrok)
-                const publicUrl = process.env.PUBLIC_URL || 'https://hr-automate.onrender.com';
-                const twimlUrl = `${publicUrl}/twiml/ask`;
-                console.log(`   📞 Call URL: ${twimlUrl}`);
-                
-                await twilioClient.calls.create({
-                    url: twimlUrl,
-                    to: call.phone,
-                    from: TWILIO_PHONE_NUMBER
-                });
-                call.completed = true;
-                call.completed_at = new Date().toISOString();
-                console.log(`   ✅ Call made successfully to ${call.name} (${call.phone})`);
-                updated = true;
-            } catch (err) {
-                console.error(`   ❌ Error making call with Twilio:`, err.message);
-                // Mark as failed to prevent retry
-                call.failed = true;
-                call.failed_at = new Date().toISOString();
-                call.error = err.message;
-                updated = true;
-            }
-        } else if (!call.completed && !call.failed) {
-            console.log(`   ⏰ Call not due yet (${minutesUntilCall} minutes remaining)`);
+        // Schedule existing calls
+        this.scheduleExistingCalls();
+        
+        // Start periodic check
+        this.checkInterval = setInterval(() => {
+            this.checkScheduledCalls();
+        }, 60 * 1000); // Check every minute
+    }
+
+    stop() {
+        if (!this.isRunning) return;
+        
+        this.isRunning = false;
+        if (this.checkInterval) {
+            clearInterval(this.checkInterval);
+            this.checkInterval = null;
+        }
+        console.log('🛑 Call Scheduler stopped');
+    }
+
+    scheduleExistingCalls() {
+        try {
+            const callsData = loadCalls();
+            console.log(`📋 Scheduling ${callsData.calls.length} existing calls`);
+            
+            callsData.calls.forEach(call => {
+                if (!call.completed && !call.failed) {
+                    this.scheduleCall(call);
+                }
+            });
+        } catch (error) {
+            console.error('❌ Error scheduling existing calls:', error);
         }
     }
-    
-    if (updated) {
-        saveCalls(callsData);
-        console.log(`   💾 Updated calls data`);
-    } else {
-        console.log(`   📝 No updates needed`);
+
+    scheduleCall(callData) {
+        try {
+            const callTime = new Date(callData.time);
+            const now = new Date();
+            
+            // If call is in the future, schedule it
+            if (callTime > now) {
+                const timeUntilCall = callTime.getTime() - now.getTime();
+                const jobId = `call_${callData.id}_${callData.time}`;
+                
+                // Schedule the call
+                const timeoutId = setTimeout(() => {
+                    this.makeCall(callData);
+                }, timeUntilCall);
+                
+                this.scheduledJobs.set(jobId, {
+                    timeoutId,
+                    callData,
+                    scheduledTime: callTime
+                });
+                
+                console.log(`📅 Scheduled call for ${callData.name} (${callData.phone}) at ${callTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+                return jobId;
+            } else {
+                // Call is due now or in the past
+                console.log(`⏰ Call for ${callData.name} is due now or in the past`);
+                this.makeCall(callData);
+                return null;
+            }
+        } catch (error) {
+            console.error(`❌ Error scheduling call for ${callData.name}:`, error);
+            return null;
+        }
     }
-}, 60 * 1000); // Check every minute
+
+    async makeCall(callData) {
+        try {
+            console.log(`🚀 Making scheduled call to ${callData.name} (${callData.phone})`);
+            
+            if (!this.twilioClient) {
+                throw new Error('Twilio client not configured');
+            }
+
+            // Update call status to 'In Progress'
+            const callsData = loadCalls();
+            const call = callsData.calls.find(c => c.id === callData.id);
+            if (call) {
+                call.status = 'In Progress';
+                call.started_at = new Date().toISOString();
+                saveCalls(callsData);
+            }
+
+            // Make the call
+            const publicUrl = process.env.PUBLIC_URL || 'https://hr-automate.onrender.com';
+            const twimlUrl = `${publicUrl}/twiml/ask`;
+            
+            const callResult = await this.twilioClient.calls.create({
+                url: twimlUrl,
+                to: callData.phone,
+                from: this.twilioPhoneNumber,
+                record: true, // Enable recording like Python version
+                recordingStatusCallback: `${publicUrl}/recording_status`,
+                recordingStatusCallbackEvent: ['completed']
+            });
+
+            // Update call status to completed
+            if (call) {
+                call.completed = true;
+                call.completed_at = new Date().toISOString();
+                call.twilio_call_sid = callResult.sid;
+                saveCalls(callsData);
+            }
+
+            console.log(`✅ Call completed for ${callData.name} with SID: ${callResult.sid}`);
+            return callResult.sid;
+
+        } catch (error) {
+            console.error(`❌ Error making call to ${callData.phone}:`, error.message);
+            
+            // Update call status to failed
+            const callsData = loadCalls();
+            const call = callsData.calls.find(c => c.id === callData.id);
+            if (call) {
+                call.failed = true;
+                call.failed_at = new Date().toISOString();
+                call.error = error.message;
+                saveCalls(callsData);
+            }
+            
+            return null;
+        }
+    }
+
+    checkScheduledCalls() {
+        if (!this.twilioClient) {
+            console.log('⚠️  Twilio client not available, skipping call check');
+            return;
+        }
+
+        const callsData = loadCalls();
+        const now = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000; // IST offset
+        const istTime = new Date(now.getTime() + istOffset);
+        
+        console.log(`\n🕐 Scheduler check at ${now.toISOString()} (IST: ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
+        console.log(`   Total calls: ${callsData.calls.length}`);
+        console.log(`   Active jobs: ${this.scheduledJobs.size}`);
+
+        let updated = false;
+
+        for (const call of callsData.calls) {
+            if (call.completed || call.failed) continue;
+
+            const callTime = new Date(call.time);
+            const callTimeIST = new Date(callTime.getTime() + istOffset);
+            const timeDiff = callTimeIST - istTime;
+            const minutesUntilCall = Math.floor(timeDiff / (1000 * 60));
+            
+            console.log(`   Call ${call.id}: ${call.name} (${call.phone}) - Scheduled: ${callTimeIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+            console.log(`     Status: ${call.status || 'Pending'}`);
+            console.log(`     Time until call: ${minutesUntilCall} minutes`);
+            
+            if (callTimeIST <= istTime) {
+                console.log(`   🚀 Making call to ${call.name} (${call.phone})`);
+                this.makeCall(call);
+                updated = true;
+            } else {
+                console.log(`   ⏰ Call not due yet (${minutesUntilCall} minutes remaining)`);
+            }
+        }
+        
+        if (updated) {
+            console.log(`   💾 Updated calls data`);
+        } else {
+            console.log(`   📝 No updates needed`);
+        }
+    }
+
+    getScheduledJobs() {
+        return Array.from(this.scheduledJobs.values()).map(job => ({
+            id: job.callData.id,
+            name: job.callData.name,
+            phone: job.callData.phone,
+            scheduledTime: job.scheduledTime
+        }));
+    }
+
+    cancelCall(callId) {
+        try {
+            const jobId = Array.from(this.scheduledJobs.keys()).find(key => key.includes(`call_${callId}_`));
+            if (jobId) {
+                const job = this.scheduledJobs.get(jobId);
+                clearTimeout(job.timeoutId);
+                this.scheduledJobs.delete(jobId);
+                
+                // Update call status to cancelled
+                const callsData = loadCalls();
+                const call = callsData.calls.find(c => c.id === parseInt(callId));
+                if (call) {
+                    call.status = 'Cancelled';
+                    call.cancelled_at = new Date().toISOString();
+                    saveCalls(callsData);
+                }
+                
+                console.log(`❌ Cancelled call for ${job.callData.name} (${job.callData.phone})`);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('❌ Error cancelling call:', error);
+            return false;
+        }
+    }
+}
+
+// Initialize scheduler
+const callScheduler = new CallScheduler(twilioClient, TWILIO_PHONE_NUMBER);
+
+// Start scheduler when server starts
+callScheduler.start();
 
 // GET /api/questions
 app.get('/api/questions', authenticateToken, (req, res) => {
@@ -816,6 +998,106 @@ app.post('/api/trigger-call/:callId', authenticateToken, async (req, res) => {
             success: false, 
             message: 'Failed to trigger call: ' + err.message 
         });
+    }
+});
+
+// Scheduler management endpoints
+app.get('/api/scheduler/jobs', authenticateToken, (req, res) => {
+    try {
+        const jobs = callScheduler.getScheduledJobs();
+        res.json({ 
+            success: true, 
+            jobs: jobs,
+            totalJobs: jobs.length,
+            schedulerRunning: callScheduler.isRunning
+        });
+    } catch (error) {
+        console.error('Error getting scheduled jobs:', error);
+        res.status(500).json({ success: false, message: 'Failed to get scheduled jobs' });
+    }
+});
+
+app.post('/api/scheduler/cancel/:callId', authenticateToken, (req, res) => {
+    try {
+        const callId = req.params.callId;
+        const success = callScheduler.cancelCall(callId);
+        
+        if (success) {
+            res.json({ success: true, message: 'Call cancelled successfully' });
+        } else {
+            res.status(404).json({ success: false, message: 'Call not found or already completed' });
+        }
+    } catch (error) {
+        console.error('Error cancelling call:', error);
+        res.status(500).json({ success: false, message: 'Failed to cancel call' });
+    }
+});
+
+app.post('/api/scheduler/restart', authenticateToken, (req, res) => {
+    try {
+        callScheduler.stop();
+        callScheduler.start();
+        res.json({ success: true, message: 'Scheduler restarted successfully' });
+    } catch (error) {
+        console.error('Error restarting scheduler:', error);
+        res.status(500).json({ success: false, message: 'Failed to restart scheduler' });
+    }
+});
+
+app.get('/api/scheduler/status', authenticateToken, (req, res) => {
+    try {
+        const jobs = callScheduler.getScheduledJobs();
+        const callsData = loadCalls();
+        const pendingCalls = callsData.calls.filter(call => !call.completed && !call.failed);
+        const completedCalls = callsData.calls.filter(call => call.completed);
+        const failedCalls = callsData.calls.filter(call => call.failed);
+        
+        res.json({
+            success: true,
+            schedulerRunning: callScheduler.isRunning,
+            activeJobs: jobs.length,
+            totalCalls: callsData.calls.length,
+            pendingCalls: pendingCalls.length,
+            completedCalls: completedCalls.length,
+            failedCalls: failedCalls.length,
+            twilioConfigured: !!twilioClient
+        });
+    } catch (error) {
+        console.error('Error getting scheduler status:', error);
+        res.status(500).json({ success: false, message: 'Failed to get scheduler status' });
+    }
+});
+
+// Recording status callback endpoint (like Python version)
+app.post('/recording_status', express.urlencoded({ extended: false }), (req, res) => {
+    try {
+        const { CallSid, RecordingSid, RecordingUrl, RecordingStatus } = req.body;
+        
+        console.log(`📹 Recording status update for CallSid: ${CallSid}`);
+        console.log(`   RecordingSid: ${RecordingSid}`);
+        console.log(`   Status: ${RecordingStatus}`);
+        console.log(`   URL: ${RecordingUrl}`);
+        
+        // Update call record with recording information
+        const callsData = loadCalls();
+        const call = callsData.calls.find(c => c.twilio_call_sid === CallSid);
+        
+        if (call) {
+            call.recording_sid = RecordingSid;
+            call.recording_url = RecordingUrl;
+            call.recording_status = RecordingStatus;
+            call.recording_updated_at = new Date().toISOString();
+            saveCalls(callsData);
+            
+            console.log(`✅ Updated call ${call.id} with recording info`);
+        } else {
+            console.log(`⚠️  Call not found for CallSid: ${CallSid}`);
+        }
+        
+        res.status(200).send('OK');
+    } catch (error) {
+        console.error('❌ Error handling recording status:', error);
+        res.status(500).send('Error');
     }
 });
 
