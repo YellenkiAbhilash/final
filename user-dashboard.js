@@ -273,8 +273,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.calls.length === 0) {
                         infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content'>You have no scheduled calls.</div>`;
                     } else {
-                        const callsList = data.calls.map(call => `<li><strong>${call.name}</strong> (${call.phone})<br>${new Date(call.time).toLocaleString()}</li>`).join('');
-                        infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content'><ul>${callsList}</ul></div>`;
+                        const callsList = data.calls.map(call => {
+                            const status = call.completed ? 
+                                `<span style="color: #10b981;">✓ Completed</span>` : 
+                                call.failed ? 
+                                    `<span style="color: #ef4444;">✗ Failed</span>` :
+                                    `<span style="color: #f59e0b;">⏳ Pending</span>`;
+                            
+                            const triggerBtn = !call.completed && !call.failed ? 
+                                `<button onclick="triggerCall(${call.id})" style="background: #667eea; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem; cursor: pointer; margin-left: 0.5rem;">Trigger Now</button>` : '';
+                            
+                            return `<li style="margin-bottom: 1rem; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 8px;">
+                                <strong>${call.name}</strong> (${call.phone})<br>
+                                ${new Date(call.time).toLocaleString()}<br>
+                                Status: ${status} ${triggerBtn}
+                            </li>`;
+                        }).join('');
+                        infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content'><ul style="list-style: none; padding: 0;">${callsList}</ul></div>`;
                     }
                 } else {
                     infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content'>Failed to load scheduled calls.</div>`;
@@ -380,4 +395,27 @@ document.addEventListener('DOMContentLoaded', function() {
             showNotification('admin@example.com | +1 234 567 890', 'info');
         });
     }
+
+    // Function to trigger a call manually
+    window.triggerCall = async function(callId) {
+        try {
+            const response = await fetch(`/api/trigger-call/${callId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showNotification('Call triggered successfully!', 'success');
+                // Refresh the calls list
+                statCards[1].click();
+            } else {
+                showNotification(data.message || 'Failed to trigger call', 'error');
+            }
+        } catch (err) {
+            showNotification('Network error. Please try again.', 'error');
+        }
+    };
 }); 

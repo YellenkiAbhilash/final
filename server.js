@@ -84,7 +84,16 @@ const transporter = nodemailer.createTransport({
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
-const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+
+// Initialize Twilio client only if credentials are available
+let twilioClient = null;
+if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
+    twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+    console.log('Twilio client initialized successfully');
+} else {
+    console.warn('Twilio credentials not found. Call functionality will be disabled.');
+    console.warn('Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER environment variables.');
+}
 
 // Add questions file and functions
 const questionsFile = path.join(__dirname, 'questions.json');
@@ -522,6 +531,11 @@ app.get('/api/scheduled-calls', authenticateToken, (req, res) => {
 
 // Add background scheduler before app.listen
 setInterval(async () => {
+    if (!twilioClient) {
+        console.log('Twilio client not available, skipping call scheduler');
+        return;
+    }
+    
     const callsData = loadCalls();
     const now = new Date();
     let updated = false;
@@ -529,8 +543,12 @@ setInterval(async () => {
     for (const call of callsData.calls) {
         if (!call.completed && new Date(call.time) <= now) {
             try {
+                // Use local server URL instead of external URL
+                const localUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/twiml/ask`;
+                console.log(`Making call to ${call.name} (${call.phone}) at ${localUrl}`);
+                
                 await twilioClient.calls.create({
-                    url: 'https://js-ue5o.onrender.com/twiml/ask',
+                    url: localUrl,
                     to: call.phone,
                     from: TWILIO_PHONE_NUMBER
                 });
@@ -540,6 +558,11 @@ setInterval(async () => {
                 updated = true;
             } catch (err) {
                 console.error('Error making call with Twilio:', err);
+                // Mark as failed to prevent retry
+                call.failed = true;
+                call.failed_at = new Date().toISOString();
+                call.error = err.message;
+                updated = true;
             }
         }
     }
@@ -565,6 +588,37 @@ app.post('/api/questions', authenticateToken, (req, res) => {
     }
 });
 
+// Test endpoint to verify TwiML functionality
+app.get('/test-twiml', (req, res) => {
+    const questions = loadQuestions();
+    const questionIndex = parseInt(req.query.questionIndex || '0', 10);
+    
+    const response = new VoiceResponse();
+    
+    if (questionIndex < questions.length) {
+        const gather = response.gather({
+            input: 'speech dtmf',
+            numDigits: 1,
+            action: `/test-twiml?questionIndex=${questionIndex + 1}`,
+            method: 'GET',
+            timeout: 10,
+            speechTimeout: 'auto'
+        });
+        
+        gather.say(`Question ${questionIndex + 1}: ${questions[questionIndex]}`);
+        
+        // If no response, repeat the question
+        response.say(`Question ${questionIndex + 1}: ${questions[questionIndex]}`);
+        response.redirect({ method: 'GET' }, `/test-twiml?questionIndex=${questionIndex}`);
+    } else {
+        response.say('Thank you for your responses. Goodbye!');
+        response.hangup();
+    }
+    
+    res.type('text/xml');
+    res.send(response.toString());
+});
+
 // TwiML webhook to ask questions and collect responses
 app.post('/twiml/ask', express.urlencoded({ extended: false }), (req, res) => {
     const callSid = req.body.CallSid;
@@ -572,32 +626,105 @@ app.post('/twiml/ask', express.urlencoded({ extended: false }), (req, res) => {
     const questionIndex = parseInt(req.query.questionIndex || req.body.questionIndex || '0', 10);
     const questions = loadQuestions();
     let responses = loadResponses();
+    
+    console.log(`TwiML Request - CallSid: ${callSid}, QuestionIndex: ${questionIndex}, Response: ${digits}`);
+    
     let callResponse = responses.find(r => r.callSid === callSid);
     if (!callResponse) {
-        callResponse = { callSid, answers: [] };
+        callResponse = { callSid, answers: [], timestamp: new Date().toISOString() };
         responses.push(callResponse);
     }
+    
     // Store response if present and not first question
     if (callSid && digits !== undefined && questionIndex > 0) {
         callResponse.answers[questionIndex - 1] = digits;
         saveResponses(responses);
+        console.log(`Stored response for question ${questionIndex - 1}: ${digits}`);
     }
+    
     const response = new VoiceResponse();
+    
     if (questionIndex < questions.length) {
+        // Ask the current question
         const gather = response.gather({
             input: 'speech dtmf',
             numDigits: 1,
             action: `/twiml/ask?questionIndex=${questionIndex + 1}`,
-            method: 'POST'
+            method: 'POST',
+            timeout: 10,
+            speechTimeout: 'auto'
         });
-        gather.say(questions[questionIndex]);
+        
+        gather.say(`Question ${questionIndex + 1}: ${questions[questionIndex]}`);
+        console.log(`Asking question ${questionIndex + 1}: ${questions[questionIndex]}`);
+        
+        // If no response, repeat the question
+        response.say(`Question ${questionIndex + 1}: ${questions[questionIndex]}`);
         response.redirect({ method: 'POST' }, `/twiml/ask?questionIndex=${questionIndex}`);
     } else {
+        // All questions completed
         response.say('Thank you for your responses. Goodbye!');
         response.hangup();
+        console.log(`Call completed for CallSid: ${callSid}`);
     }
+    
     res.type('text/xml');
     res.send(response.toString());
+});
+
+// Manual call trigger for testing (admin only)
+app.post('/api/trigger-call/:callId', authenticateToken, async (req, res) => {
+    if (!twilioClient) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Twilio client not configured' 
+        });
+    }
+    
+    const callId = parseInt(req.params.callId);
+    const callsData = loadCalls();
+    const call = callsData.calls.find(c => c.id === callId);
+    
+    if (!call) {
+        return res.status(404).json({ 
+            success: false, 
+            message: 'Call not found' 
+        });
+    }
+    
+    if (call.userId !== req.user.userId) {
+        return res.status(403).json({ 
+            success: false, 
+            message: 'Not authorized to trigger this call' 
+        });
+    }
+    
+    try {
+        const localUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/twiml/ask`;
+        console.log(`Manually triggering call to ${call.name} (${call.phone}) at ${localUrl}`);
+        
+        await twilioClient.calls.create({
+            url: localUrl,
+            to: call.phone,
+            from: TWILIO_PHONE_NUMBER
+        });
+        
+        call.completed = true;
+        call.completed_at = new Date().toISOString();
+        call.manual_trigger = true;
+        saveCalls(callsData);
+        
+        res.json({ 
+            success: true, 
+            message: 'Call triggered successfully' 
+        });
+    } catch (err) {
+        console.error('Error triggering call:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to trigger call: ' + err.message 
+        });
+    }
 });
 
 // Start server

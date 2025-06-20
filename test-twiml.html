@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test TwiML</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .xml-output {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+    </style>
+</head>
+<body>
+    <h1>TwiML Test Page</h1>
+    
+    <div class="test-section">
+        <h2>Test TwiML Generation</h2>
+        <p>This page helps you test the TwiML generation without needing Twilio.</p>
+        
+        <button onclick="testQuestion(0)">Test Question 1</button>
+        <button onclick="testQuestion(1)">Test Question 2</button>
+        <button onclick="testComplete()">Test Completion</button>
+        
+        <div id="xmlOutput" class="xml-output">Click a button above to see the TwiML output...</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Current Questions</h2>
+        <div id="questionsList">Loading...</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test URLs</h2>
+        <p>You can also test these URLs directly:</p>
+        <ul>
+            <li><a href="/test-twiml" target="_blank">Test TwiML (Question 1)</a></li>
+            <li><a href="/test-twiml?questionIndex=1" target="_blank">Test TwiML (Question 2)</a></li>
+            <li><a href="/test-twiml?questionIndex=2" target="_blank">Test TwiML (Completion)</a></li>
+        </ul>
+    </div>
+
+    <script>
+        // Load current questions
+        async function loadQuestions() {
+            try {
+                const response = await fetch('/api/questions');
+                const data = await response.json();
+                if (data.success) {
+                    const questionsList = document.getElementById('questionsList');
+                    if (data.questions.length === 0) {
+                        questionsList.innerHTML = '<p>No questions configured.</p>';
+                    } else {
+                        const questionsHtml = data.questions.map((q, i) => 
+                            `<p><strong>Question ${i + 1}:</strong> ${q}</p>`
+                        ).join('');
+                        questionsList.innerHTML = questionsHtml;
+                    }
+                }
+            } catch (err) {
+                document.getElementById('questionsList').innerHTML = '<p>Error loading questions.</p>';
+            }
+        }
+
+        // Test specific question
+        async function testQuestion(questionIndex) {
+            try {
+                const response = await fetch(`/test-twiml?questionIndex=${questionIndex}`);
+                const xml = await response.text();
+                document.getElementById('xmlOutput').textContent = xml;
+            } catch (err) {
+                document.getElementById('xmlOutput').textContent = 'Error: ' + err.message;
+            }
+        }
+
+        // Test completion
+        async function testComplete() {
+            try {
+                const response = await fetch('/test-twiml?questionIndex=2');
+                const xml = await response.text();
+                document.getElementById('xmlOutput').textContent = xml;
+            } catch (err) {
+                document.getElementById('xmlOutput').textContent = 'Error: ' + err.message;
+            }
+        }
+
+        // Load questions on page load
+        loadQuestions();
+    </script>
+</body>
+</html> 
