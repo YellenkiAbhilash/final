@@ -532,41 +532,63 @@ app.get('/api/scheduled-calls', authenticateToken, (req, res) => {
 // Add background scheduler before app.listen
 setInterval(async () => {
     if (!twilioClient) {
-        console.log('Twilio client not available, skipping call scheduler');
+        console.log('⚠️  Twilio client not available, skipping call scheduler');
+        console.log('   To fix this, create a .env file with your Twilio credentials');
         return;
     }
     
     const callsData = loadCalls();
     const now = new Date();
+    console.log(`\n🕐 Scheduler check at ${now.toISOString()}`);
+    console.log(`   Total calls: ${callsData.calls.length}`);
+    
     let updated = false;
 
     for (const call of callsData.calls) {
-        if (!call.completed && new Date(call.time) <= now) {
+        const callTime = new Date(call.time);
+        const timeDiff = callTime - now;
+        const minutesUntilCall = Math.floor(timeDiff / (1000 * 60));
+        
+        console.log(`   Call ${call.id}: ${call.name} (${call.phone}) - Scheduled: ${callTime.toISOString()}`);
+        console.log(`     Status: ${call.completed ? '✅ Completed' : call.failed ? '❌ Failed' : '⏳ Pending'}`);
+        console.log(`     Time until call: ${minutesUntilCall} minutes`);
+        
+        if (!call.completed && !call.failed && callTime <= now) {
+            console.log(`   🚀 Making call to ${call.name} (${call.phone})`);
             try {
-                // Use local server URL instead of external URL
-                const localUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/twiml/ask`;
-                console.log(`Making call to ${call.name} (${call.phone}) at ${localUrl}`);
+                // Use a public URL for Twilio (you'll need to deploy this or use ngrok)
+                const publicUrl = process.env.PUBLIC_URL || 'https://hr-automate.onrender.com';
+                const twimlUrl = `${publicUrl}/twiml/ask`;
+                console.log(`   📞 Call URL: ${twimlUrl}`);
                 
                 await twilioClient.calls.create({
-                    url: localUrl,
+                    url: twimlUrl,
                     to: call.phone,
                     from: TWILIO_PHONE_NUMBER
                 });
                 call.completed = true;
                 call.completed_at = new Date().toISOString();
-                console.log(`Call made to ${call.name} (${call.phone})`);
+                console.log(`   ✅ Call made successfully to ${call.name} (${call.phone})`);
                 updated = true;
             } catch (err) {
-                console.error('Error making call with Twilio:', err);
+                console.error(`   ❌ Error making call with Twilio:`, err.message);
                 // Mark as failed to prevent retry
                 call.failed = true;
                 call.failed_at = new Date().toISOString();
                 call.error = err.message;
                 updated = true;
             }
+        } else if (!call.completed && !call.failed) {
+            console.log(`   ⏰ Call not due yet (${minutesUntilCall} minutes remaining)`);
         }
     }
-    if (updated) saveCalls(callsData);
+    
+    if (updated) {
+        saveCalls(callsData);
+        console.log(`   💾 Updated calls data`);
+    } else {
+        console.log(`   📝 No updates needed`);
+    }
 }, 60 * 1000); // Check every minute
 
 // GET /api/questions
@@ -700,11 +722,12 @@ app.post('/api/trigger-call/:callId', authenticateToken, async (req, res) => {
     }
     
     try {
-        const localUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/twiml/ask`;
-        console.log(`Manually triggering call to ${call.name} (${call.phone}) at ${localUrl}`);
+        const publicUrl = process.env.PUBLIC_URL || 'https://hr-automate.onrender.com';
+        const twimlUrl = `${publicUrl}/twiml/ask`;
+        console.log(`Manually triggering call to ${call.name} (${call.phone}) at ${twimlUrl}`);
         
         await twilioClient.calls.create({
-            url: localUrl,
+            url: twimlUrl,
             to: call.phone,
             from: TWILIO_PHONE_NUMBER
         });

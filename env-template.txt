@@ -1,0 +1,28 @@
+# Copy this file to .env and fill in your Twilio credentials
+
+# Twilio Configuration (REQUIRED for calls to work)
+TWILIO_ACCOUNT_SID=your_twilio_account_sid_here
+TWILIO_AUTH_TOKEN=your_twilio_auth_token_here
+TWILIO_PHONE_NUMBER=your_twilio_phone_number_here
+
+# Server Configuration
+PORT=3000
+BASE_URL=http://localhost:3000
+
+# Public URL for Twilio webhooks (REQUIRED for calls to work)
+# This must be a publicly accessible URL (not localhost)
+# Your deployed app URL:
+PUBLIC_URL=https://hr-automate.onrender.com
+
+# JWT Secret
+JWT_SECRET=your-secret-key-change-in-production
+
+# Email Configuration (for password reset)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+
+# Password Reset URL
+RESET_URL=http://localhost:3000 
