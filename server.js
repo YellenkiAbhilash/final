@@ -772,7 +772,8 @@ cron.schedule('* * * * *', async () => {
                 call.status = 'in-progress';
                 call.twilioCallSid = twilioCall.sid;
                 updated = true;
-                console.log(`Twilio call placed to ${call.phone} (Call SID: ${twilioCall.sid})`);
+                const initiatedAtIST = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+                console.log(`Twilio call placed to ${call.phone} (Call SID: ${twilioCall.sid}) at ${initiatedAtIST} IST (scheduled for: ${call.scheduledTime})`);
             } catch (err) {
                 console.error('Twilio call error:', err);
                 call.status = 'failed';
