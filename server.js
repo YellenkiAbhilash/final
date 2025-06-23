@@ -733,7 +733,7 @@ class CallScheduler {
             const callsData = loadCalls();
             const callIndex = callsData.calls.findIndex(c => c.id === callData.id);
             if (callIndex !== -1) {
-                callsData.calls[callIndex].status = 'In Progress';
+                callsData.calls[callIndex].status = 'in-progress';
                 callsData.calls[callIndex].started_at = new Date().toISOString();
                 callsData.calls[callIndex].twilio_call_sid = twilioCall.sid;
                 saveCalls(callsData);
@@ -750,6 +750,7 @@ class CallScheduler {
             if (callIndex !== -1) {
                 callsData.calls[callIndex].failed = true;
                 callsData.calls[callIndex].failed_at = new Date().toISOString();
+                callsData.calls[callIndex].status = 'failed';
                 callsData.calls[callIndex].error = error.message;
                 saveCalls(callsData);
             }
@@ -774,7 +775,10 @@ class CallScheduler {
         let updated = false;
 
         for (const call of callsData.calls) {
-            if (call.completed || call.failed) continue;
+            // Skip if already completed, failed, or in progress
+            if (call.completed || call.failed || call.status === 'in-progress' || call.status === 'completed') {
+                continue;
+            }
 
             // Parse call time correctly
             let callTime;
@@ -802,6 +806,13 @@ class CallScheduler {
             console.log(`     Time until call: ${minutesUntilCall} minutes`);
             
             if (callTime <= now) {
+                console.log(`   ⏰ Call for ${call.name} is due now or in the past`);
+                
+                // Mark call as in-progress to prevent duplicate calls
+                call.status = 'in-progress';
+                call.started_at = new Date().toISOString();
+                saveCalls(callsData);
+                
                 console.log(`   🚀 Making scheduled call to ${call.name} (${call.phone})`);
                 this.makeCall(call);
                 updated = true;
@@ -991,14 +1002,6 @@ app.post('/twiml/ask', express.urlencoded({ extended: false }), (req, res) => {
             responses.push(callResponse);
         }
         
-        // Store response if present and not first question
-        if (callSid && digits !== undefined && questionIndex > 0) {
-            callResponse.answers[questionIndex - 1] = digits;
-            callResponse.confidences[questionIndex - 1] = parseFloat(req.body.Confidence) || 0;
-            saveResponses(responses);
-            console.log(`💾 Stored response for question ${questionIndex - 1}: ${digits}`);
-        }
-        
         const response = new VoiceResponse();
         
         if (questionIndex === 0) {
@@ -1006,6 +1009,14 @@ app.post('/twiml/ask', express.urlencoded({ extended: false }), (req, res) => {
             response.say('Hello, this is an automated call. Please answer the following questions.');
             response.redirect({ method: 'POST' }, `/twiml/ask?questionIndex=1`);
         } else if (questionIndex <= questions.length) {
+            // Store response if present and not first question
+            if (digits !== undefined && questionIndex > 0) {
+                callResponse.answers[questionIndex - 1] = digits;
+                callResponse.confidences[questionIndex - 1] = parseFloat(req.body.Confidence) || 0;
+                saveResponses(responses);
+                console.log(`💾 Stored response for question ${questionIndex - 1}: ${digits}`);
+            }
+            
             // Ask the current question
             const gather = response.gather({
                 input: 'speech dtmf',
@@ -1019,9 +1030,9 @@ app.post('/twiml/ask', express.urlencoded({ extended: false }), (req, res) => {
             gather.say(`Question ${questionIndex}: ${questions[questionIndex - 1]}`);
             console.log(`❓ Asking question ${questionIndex}: ${questions[questionIndex - 1]}`);
             
-            // If no response, repeat the question
+            // If no response within timeout, move to next question
             response.say(`Question ${questionIndex}: ${questions[questionIndex - 1]}`);
-            response.redirect({ method: 'POST' }, `/twiml/ask?questionIndex=${questionIndex}`);
+            response.redirect({ method: 'POST' }, `/twiml/ask?questionIndex=${questionIndex + 1}`);
         } else {
             // All questions completed
             response.say('Thank you for your responses. Goodbye!');
@@ -1034,7 +1045,7 @@ app.post('/twiml/ask', express.urlencoded({ extended: false }), (req, res) => {
             if (call) {
                 call.completed = true;
                 call.completed_at = new Date().toISOString();
-                call.status = 'Completed';
+                call.status = 'completed';
                 saveCalls(callsData);
                 console.log(`✅ Updated call ${call.id} status to completed`);
             }
@@ -1274,7 +1285,7 @@ app.post('/call-status', express.urlencoded({ extended: false }), (req, res) => 
             if (CallStatus === 'completed' || CallStatus === 'busy' || CallStatus === 'no-answer' || CallStatus === 'failed') {
                 call.completed = true;
                 call.completed_at = new Date().toISOString();
-                call.status = CallStatus === 'completed' ? 'Completed' : 'Failed';
+                call.status = CallStatus === 'completed' ? 'completed' : 'failed';
             }
             
             saveCalls(callsData);
