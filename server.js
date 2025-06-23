@@ -638,7 +638,32 @@ class CallScheduler {
 
     scheduleCall(callData) {
         try {
-            const callTime = new Date(callData.time);
+            // Parse the time string and handle timezone correctly
+            let callTime;
+            
+            // If the time is already a Date object, use it
+            if (callData.time instanceof Date) {
+                callTime = callData.time;
+            } else {
+                // If it's a string, parse it as IST time
+                const timeString = callData.time;
+                
+                // Check if it's already in ISO format (UTC)
+                if (timeString.includes('T') && timeString.includes('Z')) {
+                    // It's already in UTC, convert to IST
+                    callTime = new Date(timeString);
+                } else {
+                    // It's a local time string, treat it as IST
+                    // Create a date object in IST
+                    const [datePart, timePart] = timeString.split('T');
+                    const [year, month, day] = datePart.split('-').map(Number);
+                    const [hour, minute] = timePart.split(':').map(Number);
+                    
+                    // Create date in IST (UTC+5:30)
+                    callTime = new Date(Date.UTC(year, month - 1, day, hour, minute) - (5.5 * 60 * 60 * 1000));
+                }
+            }
+            
             const now = new Date();
             
             // If call is in the future, schedule it
@@ -657,7 +682,9 @@ class CallScheduler {
                     scheduledTime: callTime
                 });
                 
-                console.log(`📅 Scheduled call for ${callData.name} (${callData.phone}) at ${callTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+                // Display in IST
+                const istTime = new Date(callTime.getTime() + (5.5 * 60 * 60 * 1000));
+                console.log(`📅 Scheduled call for ${callData.name} (${callData.phone}) at ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
                 return jobId;
             } else {
                 // Call is due now or in the past
@@ -748,10 +775,8 @@ class CallScheduler {
 
         const callsData = loadCalls();
         const now = new Date();
-        const istOffset = 5.5 * 60 * 60 * 1000; // IST offset
-        const istTime = new Date(now.getTime() + istOffset);
         
-        console.log(`\n🕐 Scheduler check at ${now.toISOString()} (IST: ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
+        console.log(`\n🕐 Scheduler check at ${now.toISOString()} (IST: ${now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
         console.log(`   Total calls: ${callsData.calls.length}`);
         console.log(`   Active jobs: ${this.scheduledJobs.size}`);
 
@@ -760,17 +785,33 @@ class CallScheduler {
         for (const call of callsData.calls) {
             if (call.completed || call.failed) continue;
 
-            const callTime = new Date(call.time);
-            const callTimeIST = new Date(callTime.getTime() + istOffset);
-            const timeDiff = callTimeIST - istTime;
+            // Parse call time correctly
+            let callTime;
+            if (call.time instanceof Date) {
+                callTime = call.time;
+            } else {
+                const timeString = call.time;
+                if (timeString.includes('T') && timeString.includes('Z')) {
+                    callTime = new Date(timeString);
+                } else {
+                    const [datePart, timePart] = timeString.split('T');
+                    const [year, month, day] = datePart.split('-').map(Number);
+                    const [hour, minute] = timePart.split(':').map(Number);
+                    callTime = new Date(Date.UTC(year, month - 1, day, hour, minute) - (5.5 * 60 * 60 * 1000));
+                }
+            }
+            
+            const timeDiff = callTime - now;
             const minutesUntilCall = Math.floor(timeDiff / (1000 * 60));
             
-            console.log(`   Call ${call.id}: ${call.name} (${call.phone}) - Scheduled: ${callTimeIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+            // Display in IST
+            const istTime = new Date(callTime.getTime() + (5.5 * 60 * 60 * 1000));
+            console.log(`   Call ${call.id}: ${call.name} (${call.phone}) - Scheduled: ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
             console.log(`     Status: ${call.status || 'Pending'}`);
             console.log(`     Time until call: ${minutesUntilCall} minutes`);
             
-            if (callTimeIST <= istTime) {
-                console.log(`   🚀 Making call to ${call.name} (${call.phone})`);
+            if (callTime <= now) {
+                console.log(`   🚀 Making scheduled call to ${call.name} (${call.phone})`);
                 this.makeCall(call);
                 updated = true;
             } else {
