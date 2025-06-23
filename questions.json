@@ -1,6 +1,7 @@
 {
   "questions": [
     "what is your name?",
-    "what is your age?"
+    "what is your age?",
+    "what is your previous job role"
   ]
 }

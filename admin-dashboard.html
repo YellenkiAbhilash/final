@@ -34,9 +34,14 @@
             <div class="user-management">
                 <div class="section-header">
                     <h2><i class="fas fa-users-cog"></i> User Management</h2>
-                    <button id="addUserBtn" class="add-user-btn">
-                        <i class="fas fa-plus"></i> Add User
-                    </button>
+                    <div class="header-actions">
+                        <button id="downloadResponsesBtn" class="download-btn">
+                            <i class="fas fa-download"></i> Download Responses
+                        </button>
+                        <button id="addUserBtn" class="add-user-btn">
+                            <i class="fas fa-plus"></i> Add User
+                        </button>
+                    </div>
                 </div>
                 <div class="user-table-container">
                     <table id="userTable">
@@ -56,6 +61,227 @@
                             <!-- User data will be injected here by JS -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Admin-specific feature: Schedule Calls -->
+            <div class="schedule-calls">
+                <div class="section-header">
+                    <h2><i class="fas fa-phone"></i> Schedule Calls</h2>
+                </div>
+                <form id="scheduleForm" class="schedule-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="contactName">Contact Name:</label>
+                            <input type="text" id="contactName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="phoneNumber">Phone Number:</label>
+                            <input type="tel" id="phoneNumber" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="scheduledTime">Scheduled Time:</label>
+                            <input type="datetime-local" id="scheduledTime" required>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" id="scheduleCallBtn" class="schedule-btn">
+                            <i class="fas fa-phone"></i> Schedule Call
+                        </button>
+                        <button type="button" id="cancelEditBtn" class="cancel-btn" style="display: none;">
+                            <i class="fas fa-times"></i> Cancel Edit
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Admin-specific feature: Questions Management -->
+            <div class="questions-management">
+                <div class="section-header">
+                    <h2><i class="fas fa-question-circle"></i> Manage Questions</h2>
+                    <div class="header-actions">
+                        <button id="addQuestionBtn" class="add-question-btn">
+                            <i class="fas fa-plus"></i> Add Question
+                        </button>
+                        <button id="saveQuestionsBtn" class="save-btn">
+                            <i class="fas fa-save"></i> Save Questions
+                        </button>
+                    </div>
+                </div>
+                <div class="questions-container">
+                    <div id="questionsList" class="questions-list">
+                        <!-- Questions will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Section -->
+            <div class="reports-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-chart-bar"></i> Reports & Analytics</h2>
+                    <div class="header-actions">
+                        <button id="downloadAllReportsBtn" class="download-btn">
+                            <i class="fas fa-download"></i> Download All Reports
+                        </button>
+                        <button id="refreshReportsBtn" class="refresh-btn">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Reports Tabs -->
+                <div class="reports-tabs">
+                    <button class="tab-btn active" data-tab="calls">Call Transactions</button>
+                    <button class="tab-btn" data-tab="responses">Response Reports</button>
+                    <button class="tab-btn" data-tab="transcripts">Call Transcripts</button>
+                    <button class="tab-btn" data-tab="users">User Analytics</button>
+                </div>
+
+                <!-- Call Transactions Tab -->
+                <div id="calls-tab" class="tab-content active">
+                    <div class="tab-header">
+                        <h3><i class="fas fa-phone"></i> Call Transaction History</h3>
+                        <div class="tab-actions">
+                            <button id="downloadCallsBtn" class="download-btn">
+                                <i class="fas fa-download"></i> Download Calls
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table id="callsTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Contact Name</th>
+                                    <th>Phone Number</th>
+                                    <th>Scheduled Time</th>
+                                    <th>Status</th>
+                                    <th>Created By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="callsTableBody">
+                                <!-- Call data will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Response Reports Tab -->
+                <div id="responses-tab" class="tab-content">
+                    <div class="tab-header">
+                        <h3><i class="fas fa-comments"></i> Response Reports</h3>
+                        <div class="tab-actions">
+                            <button id="downloadResponsesTabBtn" class="download-btn">
+                                <i class="fas fa-download"></i> Download Responses
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table id="responsesTable">
+                            <thead>
+                                <tr>
+                                    <th>Response ID</th>
+                                    <th>Call SID</th>
+                                    <th>User</th>
+                                    <th>Phone</th>
+                                    <th>Questions Answered</th>
+                                    <th>Response Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Response data will be injected here by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Call Transcripts Tab -->
+                <div id="transcripts-tab" class="tab-content">
+                    <div class="tab-header">
+                        <h3><i class="fas fa-file-alt"></i> Call Transcripts</h3>
+                        <div class="tab-actions">
+                            <button id="downloadTranscriptsBtn" class="download-btn">
+                                <i class="fas fa-download"></i> Download Transcripts
+                            </button>
+                            <button id="refreshTranscriptsBtn" class="refresh-btn">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table id="transcriptsTable">
+                            <thead>
+                                <tr>
+                                    <th>Transcript ID</th>
+                                    <th>Call SID</th>
+                                    <th>User</th>
+                                    <th>Contact Name</th>
+                                    <th>Phone</th>
+                                    <th>Call Date</th>
+                                    <th>Duration</th>
+                                    <th>Words Count</th>
+                                    <th>Confidence</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Transcript data will be injected here by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- User Analytics Tab -->
+                <div id="users-tab" class="tab-content">
+                    <div class="tab-header">
+                        <h3><i class="fas fa-users"></i> User Analytics</h3>
+                        <div class="tab-actions">
+                            <button id="downloadUsersBtn" class="download-btn">
+                                <i class="fas fa-download"></i> Download Analytics
+                            </button>
+                        </div>
+                    </div>
+                    <div class="analytics-grid">
+                        <div class="analytics-card">
+                            <div class="analytics-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="analytics-content">
+                                <h4>Total Users</h4>
+                                <p id="totalUsers">0</p>
+                            </div>
+                        </div>
+                        <div class="analytics-card">
+                            <div class="analytics-icon">
+                                <i class="fas fa-phone"></i>
+                            </div>
+                            <div class="analytics-content">
+                                <h4>Total Calls</h4>
+                                <p id="totalCalls">0</p>
+                            </div>
+                        </div>
+                        <div class="analytics-card">
+                            <div class="analytics-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="analytics-content">
+                                <h4>Completed Calls</h4>
+                                <p id="completedCalls">0</p>
+                            </div>
+                        </div>
+                        <div class="analytics-card">
+                            <div class="analytics-icon">
+                                <i class="fas fa-times-circle"></i>
+                            </div>
+                            <div class="analytics-content">
+                                <h4>Failed Calls</h4>
+                                <p id="failedCalls">0</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>

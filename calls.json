@@ -59,7 +59,10 @@
       "name": "harsha",
       "phone": "+91 8008162349",
       "time": "2025-06-20T16:58:00.000Z",
-      "created_at": "2025-06-20T11:30:00.000Z"
+      "created_at": "2025-06-20T11:30:00.000Z",
+      "failed": true,
+      "failed_at": "2025-06-20T17:49:59.835Z",
+      "error": "getaddrinfo ENOTFOUND api.twilio.com"
     },
     {
       "id": 7,
@@ -78,8 +81,10 @@
       "phone": "+919876543210",
       "time": "2025-06-20T17:05:05.682Z",
       "completed": false,
-      "failed": false,
-      "created_at": "2025-06-20T11:34:05.682Z"
+      "failed": true,
+      "created_at": "2025-06-20T11:34:05.682Z",
+      "failed_at": "2025-06-20T17:49:59.847Z",
+      "error": "getaddrinfo ENOTFOUND api.twilio.com"
     },
     {
       "id": "test-ist-1750419257526",
@@ -87,8 +92,10 @@
       "phone": "+919876543210",
       "time": "2025-06-20T17:06:17.526Z",
       "completed": false,
-      "failed": false,
-      "created_at": "2025-06-20T11:34:17.526Z"
+      "failed": true,
+      "created_at": "2025-06-20T11:34:17.526Z",
+      "failed_at": "2025-06-20T17:49:59.854Z",
+      "error": "getaddrinfo ENOTFOUND api.twilio.com"
     },
     {
       "id": "test-ist-1750419268290",
@@ -96,8 +103,10 @@
       "phone": "+919876543210",
       "time": "2025-06-20T17:06:28.290Z",
       "completed": false,
-      "failed": false,
-      "created_at": "2025-06-20T11:34:28.291Z"
+      "failed": true,
+      "created_at": "2025-06-20T11:34:28.291Z",
+      "failed_at": "2025-06-20T17:49:59.861Z",
+      "error": "getaddrinfo ENOTFOUND api.twilio.com"
     },
     {
       "id": "test-ist-1750420473629",
@@ -127,8 +136,56 @@
       "phone": "+919876543210",
       "time": "2025-06-20T17:44:10.251Z",
       "completed": false,
-      "failed": false,
-      "created_at": "2025-06-20T12:13:10.252Z"
+      "failed": true,
+      "created_at": "2025-06-20T12:13:10.252Z",
+      "failed_at": "2025-06-20T17:49:59.867Z",
+      "error": "getaddrinfo ENOTFOUND api.twilio.com"
+    },
+    {
+      "id": "test-scheduling-001",
+      "userId": 1,
+      "name": "Test Scheduling Call",
+      "phone": "+1234567890",
+      "time": "2025-06-23T10:20:00.000Z",
+      "created_at": "2025-06-23T10:18:00.000Z",
+      "status": "Pending"
+    },
+    {
+      "id": 15,
+      "userId": 1,
+      "name": "venkatesh",
+      "phone": "+91 8008162349",
+      "time": "2025-06-23T10:55",
+      "status": "In Progress",
+      "created_at": "2025-06-23T05:23:24.852Z",
+      "started_at": "2025-06-23T05:25:00.005Z",
+      "completed": true,
+      "completed_at": "2025-06-23T05:25:01.370Z",
+      "twilio_call_sid": "CA107020c9d004019b9ce96a20dda5a203"
+    },
+    {
+      "id": 16,
+      "userId": 1,
+      "name": "harsha",
+      "phone": "+91 8008162349",
+      "time": "2025-06-23T11:51",
+      "status": "Scheduled",
+      "created_at": "2025-06-23T06:19:48.879Z",
+      "completed": true,
+      "completed_at": "2025-06-23T06:21:01.203Z",
+      "twilio_call_sid": "CA9bc6fbedaf51d31d1c4332cb10e1d880"
+    },
+    {
+      "id": 17,
+      "userId": 1,
+      "name": "harsha",
+      "phone": "+91 8008162349",
+      "time": "2025-06-23T11:57",
+      "status": "Scheduled",
+      "created_at": "2025-06-23T06:27:00.260Z",
+      "completed": true,
+      "completed_at": "2025-06-23T06:27:00.611Z",
+      "twilio_call_sid": "CA79fcbe1e105bd275f6f2334eb07968ef"
     }
   ]
 }

@@ -7,6 +7,7 @@ const cors = require('cors');
 const nodemailer = require('nodemailer');
 const twilio = require('twilio');
 const { twiml: { VoiceResponse } } = require('twilio');
+const XLSX = require('xlsx');
 require('dotenv').config();
 
 const app = express();
@@ -139,6 +140,30 @@ function saveResponses(responses) {
         return true;
     } catch (error) {
         console.error('Error saving responses:', error);
+        return false;
+    }
+}
+
+// Transcript file and functions
+const transcriptsFile = path.join(__dirname, 'transcripts.json');
+function loadTranscripts() {
+    try {
+        if (!fs.existsSync(transcriptsFile)) {
+            fs.writeFileSync(transcriptsFile, JSON.stringify({ transcripts: [] }, null, 2));
+        }
+        const data = fs.readFileSync(transcriptsFile, 'utf8');
+        return JSON.parse(data).transcripts;
+    } catch (error) {
+        console.error('Error loading transcripts:', error);
+        return [];
+    }
+}
+function saveTranscripts(transcripts) {
+    try {
+        fs.writeFileSync(transcriptsFile, JSON.stringify({ transcripts }, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Error saving transcripts:', error);
         return false;
     }
 }
@@ -637,57 +662,68 @@ class CallScheduler {
         try {
             console.log(`🚀 Making scheduled call to ${callData.name} (${callData.phone})`);
             
-            if (!this.twilioClient) {
-                throw new Error('Twilio client not configured');
-            }
-
-            // Update call status to 'In Progress'
-            const callsData = loadCalls();
-            const call = callsData.calls.find(c => c.id === callData.id);
-            if (call) {
-                call.status = 'In Progress';
-                call.started_at = new Date().toISOString();
-                saveCalls(callsData);
-            }
-
-            // Make the call
-            const publicUrl = process.env.PUBLIC_URL || 'https://hr-automate.onrender.com';
-            const twimlUrl = `${publicUrl}/twiml/ask`;
+            // Load questions from questions.json
+            const questions = loadQuestions();
             
-            const callResult = await this.twilioClient.calls.create({
-                url: twimlUrl,
-                to: callData.phone,
-                from: this.twilioPhoneNumber,
-                record: true, // Enable recording like Python version
-                recordingStatusCallback: `${publicUrl}/recording_status`,
-                recordingStatusCallbackEvent: ['completed']
+            if (questions.length === 0) {
+                console.error('❌ No questions defined. Please add questions in the admin dashboard.');
+                throw new Error('No questions defined');
+            }
+            
+            // Create TwiML for the call
+            const twiml = new twilio.twiml.VoiceResponse();
+            
+            // Add greeting
+            twiml.say('Hello, this is an automated call. Please answer the following questions.');
+            
+            // Add questions with gather
+            questions.forEach((question, index) => {
+                twiml.say(question);
+                twiml.gather({
+                    input: 'speech',
+                    timeout: 10,
+                    action: `/handle-response?question=${index + 1}&callId=${callData.id}`,
+                    method: 'POST'
+                });
             });
-
-            // Update call status to completed
-            if (call) {
-                call.completed = true;
-                call.completed_at = new Date().toISOString();
-                call.twilio_call_sid = callResult.sid;
+            
+            twiml.say('Thank you for your responses. Goodbye!');
+            
+            // Make the call using Twilio
+            const twilioCall = await twilioClient.calls.create({
+                twiml: twiml.toString(),
+                to: callData.phone,
+                from: this.twilioPhoneNumber
+            });
+            
+            console.log(`✅ Call completed for ${callData.name} with SID: ${twilioCall.sid}`);
+            
+            // Update call status
+            const callsData = loadCalls();
+            const callIndex = callsData.calls.findIndex(c => c.id === callData.id);
+            if (callIndex !== -1) {
+                callsData.calls[callIndex].completed = true;
+                callsData.calls[callIndex].completed_at = new Date().toISOString();
+                callsData.calls[callIndex].twilio_call_sid = twilioCall.sid;
                 saveCalls(callsData);
             }
-
-            console.log(`✅ Call completed for ${callData.name} with SID: ${callResult.sid}`);
-            return callResult.sid;
-
+            
+            return twilioCall;
+            
         } catch (error) {
-            console.error(`❌ Error making call to ${callData.phone}:`, error.message);
+            console.error(`❌ Error making call to ${callData.name}:`, error);
             
             // Update call status to failed
             const callsData = loadCalls();
-            const call = callsData.calls.find(c => c.id === callData.id);
-            if (call) {
-                call.failed = true;
-                call.failed_at = new Date().toISOString();
-                call.error = error.message;
+            const callIndex = callsData.calls.findIndex(c => c.id === callData.id);
+            if (callIndex !== -1) {
+                callsData.calls[callIndex].failed = true;
+                callsData.calls[callIndex].failed_at = new Date().toISOString();
+                callsData.calls[callIndex].error = error.message;
                 saveCalls(callsData);
             }
             
-            return null;
+            throw error;
         }
     }
 
@@ -781,20 +817,76 @@ callScheduler.start();
 
 // GET /api/questions
 app.get('/api/questions', authenticateToken, (req, res) => {
-    const questions = loadQuestions();
-    res.json({ success: true, questions });
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Only admins can view questions' 
+            });
+        }
+
+        const questions = loadQuestions();
+        res.json({ 
+            success: true, 
+            questions: questions 
+        });
+    } catch (error) {
+        console.error('Error fetching questions:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to fetch questions' 
+        });
+    }
 });
 
-// POST /api/questions
-app.post('/api/questions', authenticateToken, (req, res) => {
-    const { questions } = req.body;
-    if (!Array.isArray(questions)) {
-        return res.status(400).json({ success: false, message: 'Questions must be an array.' });
-    }
-    if (saveQuestions(questions)) {
-        res.json({ success: true, questions });
-    } else {
-        res.status(500).json({ success: false, message: 'Failed to save questions.' });
+// Update questions
+app.put('/api/questions', authenticateToken, (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Only admins can update questions' 
+            });
+        }
+
+        const { questions } = req.body;
+
+        if (!questions || !Array.isArray(questions)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Questions array is required' 
+            });
+        }
+
+        // Filter out empty questions
+        const validQuestions = questions.filter(q => q && q.trim() !== '');
+
+        if (validQuestions.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'At least one question is required' 
+            });
+        }
+
+        if (saveQuestions(validQuestions)) {
+            console.log(`📝 Questions updated successfully: ${validQuestions.length} questions`);
+            res.json({ 
+                success: true, 
+                message: 'Questions updated successfully',
+                questions: validQuestions
+            });
+        } else {
+            res.status(500).json({ 
+                success: false, 
+                message: 'Failed to save questions' 
+            });
+        }
+    } catch (error) {
+        console.error('Error updating questions:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to update questions: ' + error.message 
+        });
     }
 });
 
@@ -1098,6 +1190,700 @@ app.post('/recording_status', express.urlencoded({ extended: false }), (req, res
     } catch (error) {
         console.error('❌ Error handling recording status:', error);
         res.status(500).send('Error');
+    }
+});
+
+// Excel download endpoint for user call responses
+app.get('/api/download-responses', authenticateToken, (req, res) => {
+    try {
+        // Check if user is admin
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Only admins can download response data' 
+            });
+        }
+
+        const responses = loadResponses();
+        const callsData = loadCalls();
+        const usersData = loadUsers();
+
+        if (responses.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'No response data available for download' 
+            });
+        }
+
+        // Create workbook and worksheet
+        const workbook = XLSX.utils.book_new();
+        
+        // Prepare data for Excel
+        const excelData = responses.map(response => {
+            // Find corresponding call data
+            const call = callsData.calls.find(c => c.twilio_call_sid === response.callSid);
+            const user = usersData.users.find(u => u.id === (call ? call.userId : null));
+            
+            return {
+                'Response ID': response.id || 'N/A',
+                'Call SID': response.callSid || 'N/A',
+                'User Name': user ? user.name : 'N/A',
+                'User Email': user ? user.email : 'N/A',
+                'Phone Number': call ? call.phone : 'N/A',
+                'Call Date': call ? new Date(call.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A',
+                'Question 1': response.answers && response.answers.length > 0 ? response.answers[0] : 'N/A',
+                'Question 2': response.answers && response.answers.length > 1 ? response.answers[1] : 'N/A',
+                'Question 3': response.answers && response.answers.length > 2 ? response.answers[2] : 'N/A',
+                'Question 4': response.answers && response.answers.length > 3 ? response.answers[3] : 'N/A',
+                'Question 5': response.answers && response.answers.length > 4 ? response.answers[4] : 'N/A',
+                'Total Questions Answered': response.answers ? response.answers.length : 0,
+                'Response Date': new Date(response.timestamp || Date.now()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+                'Call Status': call ? (call.completed ? 'Completed' : call.failed ? 'Failed' : 'Pending') : 'N/A',
+                'Recording URL': call ? (call.recording_url || 'N/A') : 'N/A'
+            };
+        });
+
+        // Create worksheet
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
+        
+        // Set column widths
+        const columnWidths = [
+            { wch: 15 }, // Response ID
+            { wch: 35 }, // Call SID
+            { wch: 20 }, // User Name
+            { wch: 25 }, // User Email
+            { wch: 15 }, // Phone Number
+            { wch: 20 }, // Call Date
+            { wch: 30 }, // Question 1
+            { wch: 30 }, // Question 2
+            { wch: 30 }, // Question 3
+            { wch: 30 }, // Question 4
+            { wch: 30 }, // Question 5
+            { wch: 20 }, // Total Questions Answered
+            { wch: 20 }, // Response Date
+            { wch: 15 }, // Call Status
+            { wch: 50 }  // Recording URL
+        ];
+        worksheet['!cols'] = columnWidths;
+
+        // Add worksheet to workbook
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Call Responses');
+
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+        const filename = `call_responses_${timestamp}.xlsx`;
+
+        // Set response headers
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        // Write to buffer and send
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        res.send(buffer);
+
+        console.log(`📊 Excel report downloaded: ${filename} with ${responses.length} responses`);
+
+    } catch (error) {
+        console.error('Error generating Excel report:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to generate Excel report: ' + error.message 
+        });
+    }
+});
+
+// API endpoint to get all calls
+app.get('/api/calls', authenticateToken, (req, res) => {
+    try {
+        const callsData = loadCalls();
+        res.json({ 
+            success: true, 
+            calls: callsData.calls 
+        });
+    } catch (error) {
+        console.error('Error fetching calls:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to fetch calls' 
+        });
+    }
+});
+
+// API endpoint to get all responses
+app.get('/api/responses', authenticateToken, (req, res) => {
+    try {
+        const responses = loadResponses();
+        const callsData = loadCalls();
+        const usersData = loadUsers();
+
+        // Enhance response data with user and call information
+        const enhancedResponses = responses.map(response => {
+            const call = callsData.calls.find(c => c.twilio_call_sid === response.callSid);
+            const user = usersData.users.find(u => u.id === (call ? call.userId : null));
+            
+            return {
+                ...response,
+                userName: user ? user.name : 'N/A',
+                phone: call ? call.phone : 'N/A'
+            };
+        });
+
+        res.json({ 
+            success: true, 
+            responses: enhancedResponses 
+        });
+    } catch (error) {
+        console.error('Error fetching responses:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to fetch responses' 
+        });
+    }
+});
+
+// API endpoint to get all transcripts
+app.get('/api/transcripts', authenticateToken, (req, res) => {
+    try {
+        const transcripts = loadTranscripts();
+        const usersData = loadUsers();
+
+        // Enhance transcript data with user information
+        const enhancedTranscripts = transcripts.map(transcript => {
+            const user = usersData.users.find(u => u.id === transcript.userId);
+            
+            return {
+                ...transcript,
+                userName: user ? user.name : 'N/A',
+                userEmail: user ? user.email : 'N/A'
+            };
+        });
+
+        res.json({ 
+            success: true, 
+            transcripts: enhancedTranscripts 
+        });
+    } catch (error) {
+        console.error('Error fetching transcripts:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to fetch transcripts' 
+        });
+    }
+});
+
+// Individual transcript download
+app.get('/api/download-transcript/:transcriptId', authenticateToken, (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Only admins can download transcript reports' 
+            });
+        }
+
+        const transcriptId = req.params.transcriptId;
+        const transcripts = loadTranscripts();
+        const transcript = transcripts.find(t => t.id === transcriptId);
+        
+        if (!transcript) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Transcript not found' 
+            });
+        }
+
+        const usersData = loadUsers();
+        const user = usersData.users.find(u => u.id === transcript.userId);
+
+        // Create workbook
+        const workbook = XLSX.utils.book_new();
+        
+        // Prepare transcript data
+        const transcriptData = [{
+            'Transcript ID': transcript.id,
+            'Call SID': transcript.callSid,
+            'User Name': user ? user.name : 'N/A',
+            'Contact Name': transcript.contactName,
+            'Phone Number': transcript.phone,
+            'Call Date': new Date(transcript.callDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+            'Duration': transcript.duration,
+            'Words Count': transcript.wordsCount,
+            'Confidence Score': transcript.confidence,
+            'Total Questions': transcript.summary.totalQuestions,
+            'Questions Answered': transcript.summary.questionsAnswered,
+            'Average Confidence': transcript.summary.averageConfidence,
+            'Key Topics': transcript.summary.keyTopics.join(', '),
+            'Sentiment': transcript.summary.sentiment
+        }];
+
+        const worksheet = XLSX.utils.json_to_sheet(transcriptData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Transcript Summary');
+
+        // Add detailed transcript sheet
+        const detailedData = transcript.transcript.map((entry, index) => ({
+            'Line': index + 1,
+            'Speaker': entry.speaker,
+            'Text': entry.text,
+            'Timestamp': entry.timestamp,
+            'Confidence': entry.confidence || 'N/A'
+        }));
+
+        const detailedWorksheet = XLSX.utils.json_to_sheet(detailedData);
+        XLSX.utils.book_append_sheet(workbook, detailedWorksheet, 'Detailed Transcript');
+
+        const filename = `transcript_report_${transcriptId}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        res.send(buffer);
+
+    } catch (error) {
+        console.error('Error generating transcript report:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to generate transcript report: ' + error.message 
+        });
+    }
+});
+
+// Download all transcripts
+app.get('/api/download-transcripts-report', authenticateToken, (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Only admins can download transcripts reports' 
+            });
+        }
+
+        const transcripts = loadTranscripts();
+        const usersData = loadUsers();
+
+        if (transcripts.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'No transcript data available for download' 
+            });
+        }
+
+        // Create workbook
+        const workbook = XLSX.utils.book_new();
+        
+        // Prepare transcripts summary data
+        const excelData = transcripts.map(transcript => {
+            const user = usersData.users.find(u => u.id === transcript.userId);
+            return {
+                'Transcript ID': transcript.id,
+                'Call SID': transcript.callSid,
+                'User Name': user ? user.name : 'N/A',
+                'Contact Name': transcript.contactName,
+                'Phone Number': transcript.phone,
+                'Call Date': new Date(transcript.callDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+                'Duration': transcript.duration,
+                'Words Count': transcript.wordsCount,
+                'Confidence Score': transcript.confidence,
+                'Total Questions': transcript.summary.totalQuestions,
+                'Questions Answered': transcript.summary.questionsAnswered,
+                'Average Confidence': transcript.summary.averageConfidence,
+                'Key Topics': transcript.summary.keyTopics.join(', '),
+                'Sentiment': transcript.summary.sentiment
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Transcripts Summary');
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+        const filename = `transcripts_report_${timestamp}.xlsx`;
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        res.send(buffer);
+
+    } catch (error) {
+        console.error('Error generating transcripts report:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to generate transcripts report: ' + error.message 
+        });
+    }
+});
+
+// Download all reports (placeholder - would need zip functionality)
+app.get('/api/download-all-reports', authenticateToken, (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Only admins can download all reports' 
+            });
+        }
+
+        // For now, just download the responses report as a placeholder
+        // In a full implementation, you'd create a zip file with all reports
+        const responses = loadResponses();
+        const callsData = loadCalls();
+        const usersData = loadUsers();
+
+        if (responses.length === 0 && callsData.calls.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'No data available for download' 
+            });
+        }
+
+        // Create workbook with multiple sheets
+        const workbook = XLSX.utils.book_new();
+        
+        // Add calls sheet
+        if (callsData.calls.length > 0) {
+            const callsData = loadCalls();
+            const usersData = loadUsers();
+            
+            const callsExcelData = callsData.calls.map(call => {
+                const user = usersData.users.find(u => u.id === call.userId);
+                return {
+                    'Call ID': call.id,
+                    'User Name': user ? user.name : 'N/A',
+                    'Contact Name': call.name,
+                    'Phone Number': call.phone,
+                    'Scheduled Time': new Date(call.time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+                    'Status': call.completed ? 'Completed' : call.failed ? 'Failed' : 'Pending',
+                    'Created At': new Date(call.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+                };
+            });
+            
+            const callsWorksheet = XLSX.utils.json_to_sheet(callsExcelData);
+            XLSX.utils.book_append_sheet(workbook, callsWorksheet, 'Calls');
+        }
+
+        // Add responses sheet
+        if (responses.length > 0) {
+            const responsesExcelData = responses.map(response => {
+                const call = callsData.calls.find(c => c.twilio_call_sid === response.callSid);
+                const user = usersData.users.find(u => u.id === (call ? call.userId : null));
+                
+                return {
+                    'Response ID': response.id || 'N/A',
+                    'User Name': user ? user.name : 'N/A',
+                    'Phone Number': call ? call.phone : 'N/A',
+                    'Questions Answered': response.answers ? response.answers.length : 0,
+                    'Response Date': new Date(response.timestamp || Date.now()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+                };
+            });
+            
+            const responsesWorksheet = XLSX.utils.json_to_sheet(responsesExcelData);
+            XLSX.utils.book_append_sheet(workbook, responsesWorksheet, 'Responses');
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+        const filename = `all_reports_${timestamp}.xlsx`;
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        res.send(buffer);
+
+    } catch (error) {
+        console.error('Error generating all reports:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to generate all reports: ' + error.message 
+        });
+    }
+});
+
+// Simple test endpoint
+app.get('/api/test', (req, res) => {
+    res.json({ 
+        success: true, 
+        message: 'Server is working!',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Get individual call details
+app.get('/api/calls/:callId', authenticateToken, (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Only admins can view call details' 
+            });
+        }
+
+        const callId = req.params.callId;
+        const callsData = loadCalls();
+        const call = callsData.calls.find(c => c.id == callId);
+        
+        if (!call) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Call not found' 
+            });
+        }
+
+        const usersData = loadUsers();
+        const user = usersData.users.find(u => u.id === call.userId);
+        
+        const callWithUser = {
+            ...call,
+            userName: user ? user.name : 'N/A'
+        };
+
+        res.json({ 
+            success: true, 
+            call: callWithUser 
+        });
+    } catch (error) {
+        console.error('Error fetching call details:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to fetch call details' 
+        });
+    }
+});
+
+// Update individual call
+app.put('/api/calls/:callId', authenticateToken, (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Only admins can update calls' 
+            });
+        }
+
+        const callId = req.params.callId;
+        const { name, phone, time } = req.body;
+
+        if (!name || !phone || !time) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Name, phone, and time are required' 
+            });
+        }
+
+        const callsData = loadCalls();
+        const callIndex = callsData.calls.findIndex(c => c.id == callId);
+        
+        if (callIndex === -1) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Call not found' 
+            });
+        }
+
+        const call = callsData.calls[callIndex];
+        
+        // Don't allow editing completed or failed calls
+        if (call.completed || call.failed) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Cannot edit completed or failed calls' 
+            });
+        }
+
+        // Update call details
+        callsData.calls[callIndex] = {
+            ...call,
+            name: name.trim(),
+            phone: phone.trim(),
+            time: new Date(time).toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        // Save updated calls
+        if (saveCalls(callsData)) {
+            console.log(`📝 Call ${callId} updated successfully`);
+            
+            // Reschedule the call if it's pending
+            if (scheduledJobs.has(callId)) {
+                scheduledJobs.get(callId).cancel();
+                scheduledJobs.delete(callId);
+            }
+            
+            // Schedule the updated call
+            scheduleCall(callsData.calls[callIndex]);
+            
+            res.json({ 
+                success: true, 
+                message: 'Call updated successfully' 
+            });
+        } else {
+            res.status(500).json({ 
+                success: false, 
+                message: 'Failed to save call updates' 
+            });
+        }
+    } catch (error) {
+        console.error('Error updating call:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to update call: ' + error.message 
+        });
+    }
+});
+
+// Delete individual call
+app.delete('/api/calls/:callId', authenticateToken, (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Only admins can delete calls' 
+            });
+        }
+
+        const callId = req.params.callId;
+        const callsData = loadCalls();
+        const callIndex = callsData.calls.findIndex(c => c.id == callId);
+        
+        if (callIndex === -1) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Call not found' 
+            });
+        }
+
+        const call = callsData.calls[callIndex];
+        
+        // Cancel scheduled job if exists
+        if (scheduledJobs.has(callId)) {
+            scheduledJobs.get(callId).cancel();
+            scheduledJobs.delete(callId);
+            console.log(`🗑️ Cancelled scheduled job for call ${callId}`);
+        }
+
+        // Remove call from array
+        callsData.calls.splice(callIndex, 1);
+
+        // Save updated calls
+        if (saveCalls(callsData)) {
+            console.log(`🗑️ Call ${callId} deleted successfully`);
+            res.json({ 
+                success: true, 
+                message: 'Call deleted successfully' 
+            });
+        } else {
+            res.status(500).json({ 
+                success: false, 
+                message: 'Failed to save call deletion' 
+            });
+        }
+    } catch (error) {
+        console.error('Error deleting call:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to delete call: ' + error.message 
+        });
+    }
+});
+
+// Trigger call immediately
+app.post('/api/trigger-call/:callId', authenticateToken, (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Only admins can trigger calls' 
+            });
+        }
+
+        const callId = req.params.callId;
+        const callsData = loadCalls();
+        const callIndex = callsData.calls.findIndex(c => c.id == callId);
+        
+        if (callIndex === -1) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Call not found' 
+            });
+        }
+
+        const call = callsData.calls[callIndex];
+        
+        // Don't allow triggering completed or failed calls
+        if (call.completed || call.failed) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Cannot trigger completed or failed calls' 
+            });
+        }
+
+        console.log(`🚀 Admin triggered call ${callId} immediately`);
+        
+        // Make the call immediately
+        makeCall(call)
+            .then(() => {
+                res.json({ 
+                    success: true, 
+                    message: 'Call triggered successfully' 
+                });
+            })
+            .catch(error => {
+                console.error('Error making triggered call:', error);
+                res.status(500).json({ 
+                    success: false, 
+                    message: 'Failed to trigger call: ' + error.message 
+                });
+            });
+
+    } catch (error) {
+        console.error('Error triggering call:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to trigger call: ' + error.message 
+        });
+    }
+});
+
+// Handle call responses
+app.post('/handle-response', (req, res) => {
+    try {
+        const { question, callId } = req.query;
+        const speechResult = req.body.SpeechResult;
+        const confidence = req.body.Confidence;
+        
+        console.log(`📝 Received response for question ${question} from call ${callId}: ${speechResult}`);
+        
+        // Load existing responses
+        const responses = loadResponses();
+        
+        // Find or create response record for this call
+        let responseRecord = responses.find(r => r.callSid === callId);
+        if (!responseRecord) {
+            responseRecord = {
+                id: `resp-${Date.now()}`,
+                callSid: callId,
+                answers: [],
+                confidences: [],
+                timestamp: new Date().toISOString()
+            };
+            responses.push(responseRecord);
+        }
+        
+        // Add the answer
+        responseRecord.answers[parseInt(question) - 1] = speechResult || 'No response';
+        responseRecord.confidences[parseInt(question) - 1] = confidence || 0;
+        
+        // Save responses
+        saveResponses(responses);
+        
+        // Create TwiML response
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say('Thank you for your response.');
+        
+        res.type('text/xml');
+        res.send(twiml.toString());
+        
+    } catch (error) {
+        console.error('Error handling response:', error);
+        res.status(500).send('Error processing response');
     }
 });
 
