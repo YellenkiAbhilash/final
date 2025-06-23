@@ -723,10 +723,37 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const testCallBtn = document.getElementById('testCallBtn');
+    const testCallModal = document.getElementById('testCallModal');
+    const closeTestCallModal = document.getElementById('closeTestCallModal');
+    const cancelTestCall = document.getElementById('cancelTestCall');
+    const testCallForm = document.getElementById('testCallForm');
+    const testCallPhone = document.getElementById('testCallPhone');
+    const testCallError = document.getElementById('testCallError');
+
     if (testCallBtn) {
-        testCallBtn.addEventListener('click', async function() {
-            let phone = prompt('Enter the phone number to test (in E.164 format, e.g., +1234567890):');
-            if (!phone) return;
+        testCallBtn.addEventListener('click', function() {
+            testCallPhone.value = '';
+            testCallError.textContent = '';
+            testCallModal.style.display = 'block';
+            testCallPhone.focus();
+        });
+    }
+    if (closeTestCallModal) closeTestCallModal.onclick = () => testCallModal.style.display = 'none';
+    if (cancelTestCall) cancelTestCall.onclick = () => testCallModal.style.display = 'none';
+    window.addEventListener('click', (event) => {
+        if (event.target === testCallModal) {
+            testCallModal.style.display = 'none';
+        }
+    });
+    if (testCallForm) {
+        testCallForm.onsubmit = async function(e) {
+            e.preventDefault();
+            const phone = testCallPhone.value.trim();
+            testCallError.textContent = '';
+            if (!phone) {
+                testCallError.textContent = 'Please enter a phone number.';
+                return;
+            }
             try {
                 const token = localStorage.getItem('token');
                 const response = await fetch('/api/test-call', {
@@ -740,12 +767,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
                 if (data.success) {
                     showNotification('Test call initiated!', 'success');
+                    testCallModal.style.display = 'none';
                 } else {
-                    showNotification(data.message || 'Failed to initiate test call.', 'error');
+                    testCallError.textContent = data.message || 'Failed to initiate test call.';
                 }
             } catch (error) {
-                showNotification('Failed to initiate test call. Please try again.', 'error');
+                testCallError.textContent = 'Failed to initiate test call. Please try again.';
             }
-        });
+        };
     }
 }); 
