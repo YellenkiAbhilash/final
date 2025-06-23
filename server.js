@@ -627,8 +627,16 @@ app.post('/api/schedule-call', authenticateToken, (req, res) => {
         calls.push(newCall);
         saveCalls(calls);
 
-        // Log scheduled call info in IST
-        const scheduledAtIST = new Date(time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        // Parse the time string as IST (from datetime-local input)
+        let scheduledAtIST = time;
+        if (time && time.includes('T')) {
+            const [datePart, timePart] = time.split('T');
+            const [year, month, day] = datePart.split('-').map(Number);
+            const [hour, minute] = timePart.split(':').map(Number);
+            // Create a Date object in IST
+            const istDate = new Date(year, month - 1, day, hour, minute);
+            scheduledAtIST = istDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        }
         console.log(`Scheduled call: Name=${name}, Phone=${phone}, Scheduled Time=${scheduledAtIST} IST, UserId=${user.id}`);
         
         res.json({ 
