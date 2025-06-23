@@ -2,7 +2,8 @@
   "responses": [
     {
       "id": "resp-001",
-      "callSid": "15",
+      "callSid": "CA107020c9d004019b9ce96a20dda5a203",
+      "userId": "1",
       "answers": [
         "Yes, I am interested in the position",
         "I have 5 years of experience in software development",
@@ -16,6 +17,7 @@
     {
       "id": "resp-002",
       "callSid": "test-scheduling-001",
+      "userId": "2",
       "answers": [
         "Yes, I am very interested",
         "I have 3 years of experience",
@@ -29,6 +31,7 @@
     {
       "id": "resp-003",
       "callSid": "immediate-test",
+      "userId": "3",
       "answers": [
         "No, I am not available",
         "I have 1 year of experience",
@@ -38,6 +41,34 @@
       ],
       "confidences": [0.75, 0.82, 0.79, 0.88, 0.85],
       "timestamp": "2025-06-20T17:05:00.000Z"
+    },
+    {
+      "id": "resp-004",
+      "callSid": "CA9bc6fbedaf51d31d1c4332cb10e1d880",
+      "userId": "1",
+      "answers": [
+        "Yes, I am available for the interview",
+        "I have 4 years of experience in web development",
+        "My expected salary is 60,000 dollars per year",
+        "I can start in 3 weeks",
+        "I prefer hybrid work model"
+      ],
+      "confidences": [0.95, 0.88, 0.91, 0.87, 0.93],
+      "timestamp": "2025-06-23T11:21:00.000Z"
+    },
+    {
+      "id": "resp-005",
+      "callSid": "CA79fcbe1e105bd275f6f2334eb07968ef",
+      "userId": "2",
+      "answers": [
+        "Yes, I am interested in the opportunity",
+        "I have 6 years of experience in mobile development",
+        "My expected salary is 70,000 dollars per year",
+        "I can start in 1 month",
+        "I prefer remote work with occasional office visits"
+      ],
+      "confidences": [0.91, 0.89, 0.86, 0.92, 0.88],
+      "timestamp": "2025-06-23T11:27:00.000Z"
     }
   ]
 } 

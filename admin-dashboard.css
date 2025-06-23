@@ -831,4 +831,162 @@ body { font-family: 'Inter', sans-serif; background: #f4f7fa; min-height: 100vh;
     background: #f8f9fa;
     border-radius: 8px;
     border: 2px dashed #dee2e6;
+}
+
+/* Response Details Modal Styles */
+.modal-large {
+    max-width: 800px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.response-details {
+    padding: 20px 0;
+}
+
+.response-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.response-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.response-info p {
+    margin: 0;
+    padding: 8px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.response-info p:last-child {
+    border-bottom: none;
+}
+
+.response-info strong {
+    color: #495057;
+    display: inline-block;
+    width: 100px;
+}
+
+.questions-answers {
+    margin: 20px 0;
+}
+
+.questions-answers h3 {
+    color: #495057;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #007bff;
+}
+
+.qa-item {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    overflow: hidden;
+}
+
+.qa-question {
+    background: #f8f9fa;
+    padding: 15px;
+    border-bottom: 1px solid #e9ecef;
+    font-weight: 600;
+    color: #495057;
+}
+
+.qa-answer {
+    padding: 15px;
+    background: #fff;
+}
+
+.qa-confidence {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+.confidence-high {
+    background: #d4edda;
+    color: #155724;
+}
+
+.confidence-medium {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.confidence-low {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.response-actions {
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+/* Enhanced table styles for responses */
+#responsesTable .view-btn {
+    background: #17a2b8;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-right: 5px;
+}
+
+#responsesTable .view-btn:hover {
+    background: #138496;
+}
+
+#responsesTable .download-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+#responsesTable .download-btn:hover {
+    background: #218838;
+}
+
+/* Status badges for responses */
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-badge.completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-badge.failed {
+    background: #f8d7da;
+    color: #721c24;
 } 

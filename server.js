@@ -1471,6 +1471,46 @@ app.get('/api/responses', authenticateToken, (req, res) => {
     }
 });
 
+// API endpoint to get individual response details
+app.get('/api/responses/:responseId', authenticateToken, (req, res) => {
+    try {
+        const responseId = req.params.responseId;
+        const responses = loadResponses();
+        const callsData = loadCalls();
+        const usersData = loadUsers();
+
+        const response = responses.find(r => r.id === responseId);
+        if (!response) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Response not found' 
+            });
+        }
+
+        // Enhance response data with user and call information
+        const call = callsData.calls.find(c => c.twilio_call_sid === response.callSid);
+        const user = usersData.users.find(u => u.id === (call ? call.userId : null));
+        
+        const enhancedResponse = {
+            ...response,
+            userName: user ? user.name : 'N/A',
+            phone: call ? call.phone : 'N/A',
+            contactName: call ? call.name : 'N/A'
+        };
+
+        res.json({ 
+            success: true, 
+            response: enhancedResponse 
+        });
+    } catch (error) {
+        console.error('Error fetching response details:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to fetch response details' 
+        });
+    }
+});
+
 // API endpoint to get all transcripts
 app.get('/api/transcripts', authenticateToken, (req, res) => {
     try {
@@ -2014,6 +2054,87 @@ app.post('/handle-response', (req, res) => {
     } catch (error) {
         console.error('Error handling response:', error);
         res.status(500).send('Error processing response');
+    }
+});
+
+// Individual response download
+app.get('/api/download-response-report/:responseId', authenticateToken, (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Only admins can download response reports' 
+            });
+        }
+
+        const responseId = req.params.responseId;
+        const responses = loadResponses();
+        const response = responses.find(r => r.id === responseId);
+        
+        if (!response) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Response not found' 
+            });
+        }
+
+        const callsData = loadCalls();
+        const usersData = loadUsers();
+        const questions = loadQuestions();
+
+        const call = callsData.calls.find(c => c.twilio_call_sid === response.callSid);
+        const user = usersData.users.find(u => u.id === (call ? call.userId : null));
+
+        // Create workbook
+        const workbook = XLSX.utils.book_new();
+        
+        // Prepare response summary data
+        const summaryData = [{
+            'Response ID': response.id,
+            'Call SID': response.callSid,
+            'User Name': user ? user.name : 'N/A',
+            'Contact Name': call ? call.name : 'N/A',
+            'Phone Number': call ? call.phone : 'N/A',
+            'Response Date': new Date(response.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+            'Total Questions': response.answers ? response.answers.length : 0,
+            'Average Confidence': response.confidences ? 
+                (response.confidences.reduce((a, b) => a + b, 0) / response.confidences.length * 100).toFixed(2) + '%' : 'N/A'
+        }];
+
+        const summaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(workbook, summaryWorksheet, 'Response Summary');
+
+        // Add detailed Q&A sheet
+        if (response.answers && response.answers.length > 0) {
+            const qaData = response.answers.map((answer, index) => {
+                const question = questions[index] || `Question ${index + 1}`;
+                const confidence = response.confidences ? response.confidences[index] : null;
+                
+                return {
+                    'Question Number': index + 1,
+                    'Question': question,
+                    'Answer': answer,
+                    'Confidence': confidence ? (confidence * 100).toFixed(2) + '%' : 'N/A'
+                };
+            });
+
+            const qaWorksheet = XLSX.utils.json_to_sheet(qaData);
+            XLSX.utils.book_append_sheet(workbook, qaWorksheet, 'Questions & Answers');
+        }
+
+        const filename = `response_report_${responseId}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        res.send(buffer);
+
+    } catch (error) {
+        console.error('Error generating response report:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to generate response report: ' + error.message 
+        });
     }
 });
 

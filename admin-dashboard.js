@@ -200,27 +200,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const credits = parseInt(newUserCredits.value, 10) || 0;
 
         try {
-            const response = await fetch('/api/register', {
+            const response = await fetch('/api/users', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` // Admin must be authenticated to register new users
+                    'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ name, email, password, role: 'user', credits }) // Default new user role to 'user'
+                body: JSON.stringify({ name, email, password, credits })
             });
 
-            const result = await response.json();
+            const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.message || 'Failed to create user');
+                throw new Error(data.message || 'Failed to create user');
             }
 
-            // Success
-            addUserModal.style.display = 'none'; // Close modal
-            fetchUsers(); // Refresh the user list
-            // Optionally, show a success notification
+            // Close modal and refresh users
+            addUserModal.style.display = 'none';
+            fetchUsers();
             alert('User created successfully!');
-
         } catch (error) {
             addUserError.textContent = error.message;
         }
@@ -441,6 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             data.responses.forEach(resp => {
                 const row = document.createElement('tr');
+                const responseData = JSON.stringify(resp).replace(/'/g, "&apos;");
                 row.innerHTML = `
                     <td>${resp.id || 'N/A'}</td>
                     <td>${resp.callSid || 'N/A'}</td>
@@ -450,12 +449,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${new Date(resp.timestamp || Date.now()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                     <td><span class="status-badge completed">Completed</span></td>
                     <td>
-                        <button class="individual-download-btn" onclick="downloadResponseReport('${resp.id}')">
+                        <button class="view-btn" data-response='${responseData}'>
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                        <button class="download-btn" onclick="downloadResponseReport('${resp.id}')">
                             <i class="fas fa-download"></i> Download
                         </button>
                     </td>
                 `;
                 responsesTableBody.appendChild(row);
+            });
+            
+            // Add event listeners for view buttons
+            document.querySelectorAll('.view-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const responseData = JSON.parse(e.currentTarget.dataset.response);
+                    openResponseModal(responseData);
+                });
             });
             
             console.log(`Loaded ${data.responses.length} responses successfully`);
@@ -1361,4 +1371,84 @@ document.addEventListener('DOMContentLoaded', () => {
     window.deleteCall = deleteCall;
     window.triggerCall = triggerCall;
     window.downloadCallReport = downloadCallReport;
+
+    // --- Response Modal Logic ---
+    const viewResponseModal = document.getElementById('viewResponseModal');
+    const closeResponseModalBtn = viewResponseModal.querySelector('.close-btn');
+    const downloadResponseDetailsBtn = document.getElementById('downloadResponseDetailsBtn');
+
+    // Close response modal
+    closeResponseModalBtn.addEventListener('click', () => {
+        viewResponseModal.style.display = 'none';
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === viewResponseModal) {
+            viewResponseModal.style.display = 'none';
+        }
+    });
+
+    // Open response modal with data
+    const openResponseModal = async (responseData) => {
+        try {
+            // Load questions to match with answers
+            const questionsResponse = await fetch('/api/questions', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const questionsData = await questionsResponse.json();
+            const questions = questionsData.questions || [];
+
+            // Populate modal with response data
+            document.getElementById('responseId').textContent = responseData.id || 'N/A';
+            document.getElementById('responseCallSid').textContent = responseData.callSid || 'N/A';
+            document.getElementById('responseUserName').textContent = responseData.userName || 'N/A';
+            document.getElementById('responsePhone').textContent = responseData.phone || 'N/A';
+            document.getElementById('responseDate').textContent = new Date(responseData.timestamp || Date.now()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+            // Populate questions and answers
+            const questionsAnswersList = document.getElementById('questionsAnswersList');
+            questionsAnswersList.innerHTML = '';
+
+            if (responseData.answers && responseData.answers.length > 0) {
+                responseData.answers.forEach((answer, index) => {
+                    const question = questions[index] || `Question ${index + 1}`;
+                    const confidence = responseData.confidences ? responseData.confidences[index] : null;
+                    
+                    const qaItem = document.createElement('div');
+                    qaItem.className = 'qa-item';
+                    
+                    let confidenceBadge = '';
+                    if (confidence !== null) {
+                        const confidenceClass = confidence >= 0.8 ? 'confidence-high' : 
+                                               confidence >= 0.6 ? 'confidence-medium' : 'confidence-low';
+                        confidenceBadge = `<span class="qa-confidence ${confidenceClass}">${Math.round(confidence * 100)}%</span>`;
+                    }
+                    
+                    qaItem.innerHTML = `
+                        <div class="qa-question">
+                            <strong>Q${index + 1}:</strong> ${question}
+                        </div>
+                        <div class="qa-answer">
+                            <strong>A:</strong> ${answer} ${confidenceBadge}
+                        </div>
+                    `;
+                    questionsAnswersList.appendChild(qaItem);
+                });
+            } else {
+                questionsAnswersList.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 2rem;">No answers recorded for this response.</p>';
+            }
+
+            // Set up download button
+            downloadResponseDetailsBtn.onclick = () => {
+                downloadResponseReport(responseData.id);
+            };
+
+            // Show modal
+            viewResponseModal.style.display = 'flex';
+        } catch (error) {
+            console.error('Error opening response modal:', error);
+            alert('Error loading response details: ' + error.message);
+        }
+    };
 }); 
