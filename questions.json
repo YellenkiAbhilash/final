@@ -1,24 +1,12 @@
 {
   "questions": [
     {
-      "id": 2,
-      "question": "How do I check my credits?"
-    },
-    {
       "id": 3,
-      "question": "How do I contact support?"
-    },
-    {
-      "id": 4,
-      "question": "How do I view my reports?"
-    },
-    {
-      "id": 5,
-      "question": "What happens if I run out of credits?"
+      "question": "What is your name?"
     },
     {
       "id": 6,
-      "question": "Can I cancel a scheduled call?"
+      "question": "How old are you?"
     }
   ]
 }

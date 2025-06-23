@@ -66,29 +66,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const questionsSection = document.getElementById('questionsSection');
     const statCards = document.querySelectorAll('.stat-card');
 
+    createScheduleCallModal(); // Ensure modal is created on page load
+
     // Centralized click handler for stat cards
     statCards.forEach(card => {
         card.addEventListener('click', function() {
             const title = this.querySelector('h3').textContent;
-
             if (title === 'Questions') {
                 toggleQuestionsSection();
-            } else {
-                // This handles all other cards: Scheduling, Scheduled Calls, Report
-                showNotification(`${title} feature coming soon!`, 'info');
-
-                // Ensure the questions section is hidden and the info box is visible
-                questionsSection.style.display = 'none';
-                dashboardInfoBox.style.display = 'block';
-
-                // Update the info box content based on the card clicked
-                if (title === 'Scheduling Call') {
-                    infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-plus'></i> Scheduling Call</div><div class='info-box-content'>Here you can schedule a new call. (Feature coming soon!)</div>`;
-                } else if (title === 'Scheduled Calls') {
-                    infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content'>Your scheduled calls will appear here.<ul><li>Call with John Doe - 2024-06-25 10:00 AM</li><li>Call with Jane Smith - 2024-06-27 2:00 PM</li></ul></div>`;
-                } else if (title === 'Report') {
-                    infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-file-alt'></i> Report</div><div class='info-box-content'>Your report will appear here. (Feature coming soon!)</div>`;
-                }
+            } else if (title === 'Scheduling Call') {
+                showScheduleCallForm();
+            } else if (title === 'Scheduled Calls') {
+                loadScheduledCalls();
+            } else if (title === 'Report') {
+                infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-file-alt'></i> Report</div><div class='info-box-content'>Your report will appear here. (Feature coming soon!)</div>`;
             }
         });
     });
@@ -446,4 +437,288 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
         showNotification(`Welcome back, ${user.name || user.email}!`, 'success');
     }, 1000);
+
+    // --- Call Scheduling Modal ---
+    function createScheduleCallModal() {
+        const modal = document.createElement('div');
+        modal.id = 'scheduleCallModal';
+        modal.className = 'modal';
+        modal.style.display = 'none';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <span class="close" id="closeScheduleCallModal">&times;</span>
+                <h2>Schedule a Call</h2>
+                <form id="scheduleCallForm">
+                    <div class="form-group">
+                        <label for="callName">Name:</label>
+                        <input type="text" id="callName" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="callPhone">Phone:</label>
+                        <input type="text" id="callPhone" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="callTime">Scheduled Time:</label>
+                        <input type="datetime-local" id="callTime" required />
+                    </div>
+                    <button type="submit" class="btn-primary">Schedule</button>
+                    <div id="scheduleCallError" class="error-message"></div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Close modal logic
+        document.getElementById('closeScheduleCallModal').onclick = () => {
+            modal.style.display = 'none';
+        };
+        window.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+
+        // Form submit logic
+        document.getElementById('scheduleCallForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('callName').value.trim();
+            const phone = document.getElementById('callPhone').value.trim();
+            const scheduledTime = document.getElementById('callTime').value;
+            const errorDiv = document.getElementById('scheduleCallError');
+            errorDiv.textContent = '';
+            if (!name || !phone || !scheduledTime) {
+                errorDiv.textContent = 'All fields are required!';
+                return;
+            }
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/schedule-call', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ name, phone, scheduledTime })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showNotification('Call scheduled successfully!', 'success');
+                    modal.style.display = 'none';
+                    await loadScheduledCalls();
+                } else {
+                    errorDiv.textContent = data.message || 'Failed to schedule call.';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Failed to schedule call. Please try again.';
+            }
+        });
+    }
+
+    // --- Scheduled Calls Display ---
+    async function loadScheduledCalls() {
+        const token = localStorage.getItem('token');
+        const infoBox = document.getElementById('infoBoxMessage');
+        if (!token) return;
+        try {
+            const response = await fetch('/api/scheduled-calls', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            if (data.success) {
+                if (data.calls.length === 0) {
+                    infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content'>No scheduled calls.</div>`;
+                } else {
+                    const callsHtml = data.calls.map(call => `
+                        <div class=\"scheduled-call-card\">\n                            <div class=\"call-title\">${call.name}</div>\n                            <div class=\"call-phone\">${call.phone}</div>\n                            <div class=\"call-date\">Date: ${new Date(call.scheduledTime).toLocaleString()}</div>\n                            <div class=\"call-status ${call.status}\">${call.status.charAt(0).toUpperCase() + call.status.slice(1)}</div>\n                            <div style=\"display: flex; gap: 0.5rem; justify-content: flex-end;\">\n                                <button class=\"btn-edit-call\" data-id=\"${call.id}\" ${call.status === 'completed' ? 'disabled' : ''}>Edit</button>\n                                <button class=\"btn-delete-call\" data-id=\"${call.id}\">Delete</button>\n                            </div>\n                        </div>\n                    `).join('');
+                    infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content scheduled-call-list'>${callsHtml}</div>`;
+                    // Attach edit button listeners
+                    document.querySelectorAll('.btn-edit-call').forEach(btn => {
+                        if (btn.disabled) return;
+                        btn.addEventListener('click', function() {
+                            const callId = this.getAttribute('data-id');
+                            const call = data.calls.find(c => c.id == callId);
+                            showEditCallModal(call);
+                        });
+                    });
+                    // Attach delete button listeners
+                    document.querySelectorAll('.btn-delete-call').forEach(btn => {
+                        if (btn.disabled) return;
+                        btn.addEventListener('click', async function() {
+                            const callId = this.getAttribute('data-id');
+                            if (!confirm('Are you sure you want to delete this call?')) return;
+                            try {
+                                const token = localStorage.getItem('token');
+                                const response = await fetch(`/api/scheduled-calls/${callId}`, {
+                                    method: 'DELETE',
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                const data = await response.json();
+                                if (data.success) {
+                                    showNotification('Call deleted successfully!', 'success');
+                                    loadScheduledCalls();
+                                } else {
+                                    showNotification(data.message || 'Failed to delete call.', 'error');
+                                }
+                            } catch (error) {
+                                showNotification('Failed to delete call. Please try again.', 'error');
+                            }
+                        });
+                    });
+                }
+            } else {
+                infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content'>Failed to load scheduled calls.</div>`;
+            }
+        } catch (error) {
+            infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content'>Failed to load scheduled calls.</div>`;
+        }
+    }
+
+    // Remove inline edit form logic and add modal popup for editing calls
+    function createEditCallModal() {
+        let modal = document.getElementById('editCallModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'editCallModal';
+            modal.className = 'modal';
+            modal.style.display = 'none';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <span class="close" id="closeEditCallModal">&times;</span>
+                    <h2>Edit Call</h2>
+                    <form id="editCallForm">
+                        <div class="form-group">
+                            <label for="editCallName">Name:</label>
+                            <input type="text" id="editCallName" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="editCallPhone">Phone:</label>
+                            <input type="text" id="editCallPhone" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="editCallTime">Scheduled Time:</label>
+                            <input type="datetime-local" id="editCallTime" required />
+                        </div>
+                        <button type="submit" class="btn-primary">Save</button>
+                        <button type="button" id="cancelEditCall" class="btn-secondary">Cancel</button>
+                        <div id="editCallError" class="error-message"></div>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        // Close logic
+        document.getElementById('closeEditCallModal').onclick = () => {
+            modal.style.display = 'none';
+        };
+        document.getElementById('cancelEditCall').onclick = () => {
+            modal.style.display = 'none';
+        };
+        window.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+
+    function showEditCallModal(call) {
+        createEditCallModal();
+        const modal = document.getElementById('editCallModal');
+        document.getElementById('editCallName').value = call.name;
+        document.getElementById('editCallPhone').value = call.phone;
+        document.getElementById('editCallTime').value = call.scheduledTime ? call.scheduledTime.substring(0,16) : '';
+        document.getElementById('editCallError').textContent = '';
+        modal.style.display = 'block';
+        document.getElementById('editCallForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('editCallName').value.trim();
+            const phone = document.getElementById('editCallPhone').value.trim();
+            const scheduledTime = document.getElementById('editCallTime').value;
+            const errorDiv = document.getElementById('editCallError');
+            errorDiv.textContent = '';
+            if (!name || !phone || !scheduledTime) {
+                errorDiv.textContent = 'All fields are required!';
+                return;
+            }
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/scheduled-calls/${call.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ name, phone, scheduledTime })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showNotification('Call updated successfully!', 'success');
+                    modal.style.display = 'none';
+                    loadScheduledCalls();
+                } else {
+                    errorDiv.textContent = data.message || 'Failed to update call.';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Failed to update call. Please try again.';
+            }
+        };
+    }
+
+    // Add function to render the inline scheduling form in the info box
+    function showScheduleCallForm() {
+        const infoBox = document.getElementById('infoBoxMessage');
+        infoBox.innerHTML = `
+            <div class='schedule-call-card'>
+                <h3><i class='fas fa-calendar-plus'></i> Schedule a Call</h3>
+                <form id="scheduleCallForm">
+                    <div class="form-group">
+                        <label for="callName">Name:</label>
+                        <input type="text" id="callName" placeholder="Enter name" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="callPhone">Phone:</label>
+                        <input type="text" id="callPhone" placeholder="Enter phone number" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="callTime">Scheduled Time:</label>
+                        <input type="datetime-local" id="callTime" required />
+                    </div>
+                    <button type="submit" class="btn-primary">Schedule</button>
+                    <div id="scheduleCallError" class="error-message"></div>
+                </form>
+            </div>
+        `;
+        // Attach submit handler
+        document.getElementById('scheduleCallForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('callName').value.trim();
+            const phone = document.getElementById('callPhone').value.trim();
+            const scheduledTime = document.getElementById('callTime').value;
+            const errorDiv = document.getElementById('scheduleCallError');
+            errorDiv.textContent = '';
+            if (!name || !phone || !scheduledTime) {
+                errorDiv.textContent = 'All fields are required!';
+                return;
+            }
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/schedule-call', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ name, phone, scheduledTime })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showNotification('Call scheduled successfully!', 'success');
+                    loadScheduledCalls();
+                } else {
+                    errorDiv.textContent = data.message || 'Failed to schedule call.';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Failed to schedule call. Please try again.';
+            }
+        });
+    }
 }); 

@@ -518,7 +518,7 @@ body {
 /* Info Box */
 .info-box {
     margin: 2.5rem auto 0 auto;
-    max-width: 800px;
+    max-width: 400px;
     background: linear-gradient(135deg, #f8fafc 60%, #e9d8fd 100%);
     border-radius: 24px;
     box-shadow: 0 8px 32px rgba(102,126,234,0.10);
@@ -667,4 +667,382 @@ body {
 
 .modal-body {
     padding: 1.5rem;
+}
+
+/* --- Schedule Call Modal Styles --- */
+#scheduleCallModal.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: auto;
+    background: rgba(0,0,0,0.4);
+    justify-content: center;
+    align-items: center;
+}
+#scheduleCallModal .modal-content {
+    background: #fff;
+    margin: 10% auto;
+    padding: 2rem 2.5rem;
+    border-radius: 12px;
+    max-width: 400px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    position: relative;
+    animation: fadeIn 0.2s;
+}
+#scheduleCallModal .close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 1.5rem;
+    color: #888;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+#scheduleCallModal .close:hover {
+    color: #ef4444;
+}
+#scheduleCallModal h2 {
+    margin-bottom: 1.5rem;
+    color: #667eea;
+    text-align: center;
+}
+#scheduleCallModal .form-group {
+    margin-bottom: 1.2rem;
+}
+#scheduleCallModal label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 500;
+    color: #374151;
+}
+#scheduleCallModal input[type="text"],
+#scheduleCallModal input[type="datetime-local"] {
+    width: 100%;
+    padding: 0.6rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 1rem;
+    background: #f9fafb;
+    transition: border-color 0.2s;
+}
+#scheduleCallModal input:focus {
+    border-color: #667eea;
+    outline: none;
+}
+#scheduleCallModal .btn-primary {
+    width: 100%;
+    padding: 0.7rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    transition: background 0.2s;
+}
+#scheduleCallModal .btn-primary:hover {
+    background: linear-gradient(135deg, #5a67d8 0%, #6b21a8 100%);
+}
+#scheduleCallModal .error-message {
+    color: #ef4444;
+    margin-top: 0.5rem;
+    text-align: center;
+    font-size: 0.95rem;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Edit Call Modal Styles --- */
+#editCallModal.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: auto;
+    background: rgba(0,0,0,0.45);
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.2s;
+}
+#editCallModal .modal-content {
+    background: #fff;
+    margin: 8% auto;
+    padding: 2.5rem 2.5rem 2rem 2.5rem;
+    border-radius: 16px;
+    max-width: 420px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    position: relative;
+    animation: fadeIn 0.2s;
+}
+#editCallModal .close {
+    position: absolute;
+    top: 1.2rem;
+    right: 1.2rem;
+    font-size: 1.7rem;
+    color: #888;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+#editCallModal .close:hover {
+    color: #ef4444;
+}
+#editCallModal h2 {
+    margin-bottom: 1.5rem;
+    color: #764ba2;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+#editCallModal .form-group {
+    margin-bottom: 1.2rem;
+}
+#editCallModal label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 500;
+    color: #374151;
+}
+#editCallModal input[type="text"],
+#editCallModal input[type="datetime-local"],
+#editCallModal select {
+    width: 100%;
+    padding: 0.6rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 1rem;
+    background: #f9fafb;
+    transition: border-color 0.2s;
+}
+#editCallModal input:focus,
+#editCallModal select:focus {
+    border-color: #764ba2;
+    outline: none;
+}
+#editCallModal .btn-primary {
+    width: 100%;
+    padding: 0.7rem;
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    transition: background 0.2s;
+}
+#editCallModal .btn-primary:hover {
+    background: linear-gradient(135deg, #6b21a8 0%, #5a67d8 100%);
+}
+#editCallModal .btn-secondary {
+    width: 100%;
+    padding: 0.7rem;
+    background: #f3f4f6;
+    color: #764ba2;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    transition: background 0.2s, color 0.2s;
+}
+#editCallModal .btn-secondary:hover {
+    background: #ede9fe;
+    color: #5a67d8;
+}
+#editCallModal .error-message {
+    color: #ef4444;
+    margin-top: 0.5rem;
+    text-align: center;
+    font-size: 0.95rem;
+}
+
+/* --- Inline Schedule Call Form Styles --- */
+#dashboardInfoBox .schedule-call-card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(118, 75, 162, 0.10), 0 1.5px 6px rgba(102, 126, 234, 0.08);
+    padding: 2rem 2rem 1.5rem 2rem;
+    max-width: 400px;
+    margin: 2rem auto 1.5rem auto;
+    transition: box-shadow 0.2s;
+    position: relative;
+}
+#dashboardInfoBox .schedule-call-card:hover {
+    box-shadow: 0 8px 32px rgba(118, 75, 162, 0.16), 0 3px 12px rgba(102, 126, 234, 0.12);
+}
+#dashboardInfoBox .schedule-call-card h3 {
+    color: #764ba2;
+    text-align: center;
+    margin-bottom: 1.2rem;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+#dashboardInfoBox .schedule-call-card .form-group {
+    margin-bottom: 1.1rem;
+}
+#dashboardInfoBox .schedule-call-card label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 500;
+    color: #374151;
+    font-size: 1rem;
+}
+#dashboardInfoBox .schedule-call-card input[type="text"],
+#dashboardInfoBox .schedule-call-card input[type="datetime-local"] {
+    width: 100%;
+    padding: 0.7rem;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1.05rem;
+    background: #f9fafb;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 1px 2px rgba(102, 126, 234, 0.04);
+}
+#dashboardInfoBox .schedule-call-card input:focus {
+    border-color: #764ba2;
+    outline: none;
+    box-shadow: 0 0 0 2px #e9d8fd;
+}
+#dashboardInfoBox .schedule-call-card .btn-primary {
+    width: 100%;
+    padding: 0.8rem;
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.08rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    transition: background 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.10);
+}
+#dashboardInfoBox .schedule-call-card .btn-primary:hover {
+    background: linear-gradient(135deg, #6b21a8 0%, #5a67d8 100%);
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.16);
+}
+#dashboardInfoBox .schedule-call-card .error-message {
+    color: #ef4444;
+    margin-top: 0.5rem;
+    text-align: center;
+    font-size: 0.97rem;
+}
+
+/* --- Scheduled Calls List Styles --- */
+#dashboardInfoBox .scheduled-call-list {
+    list-style: none;
+    padding: 0;
+    margin: 2rem 0 0 0;
+}
+#dashboardInfoBox .scheduled-call-card {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(102, 126, 234, 0.10);
+    padding: 1.3rem 1.5rem 1.1rem 1.5rem;
+    margin-bottom: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    position: relative;
+    transition: box-shadow 0.2s;
+}
+#dashboardInfoBox .scheduled-call-card:hover {
+    box-shadow: 0 4px 24px rgba(102, 126, 234, 0.16);
+}
+#dashboardInfoBox .scheduled-call-card .call-title {
+    font-size: 1.13rem;
+    font-weight: 600;
+    color: #764ba2;
+    margin-bottom: 0.1rem;
+    letter-spacing: 0.2px;
+}
+#dashboardInfoBox .scheduled-call-card .call-phone {
+    color: #667eea;
+    font-size: 1.01rem;
+    font-weight: 500;
+    margin-bottom: 0.2rem;
+}
+#dashboardInfoBox .scheduled-call-card .call-date {
+    color: #374151;
+    font-size: 0.98rem;
+    margin-bottom: 0.1rem;
+}
+#dashboardInfoBox .scheduled-call-card .call-status {
+    display: inline-block;
+    padding: 0.22em 0.85em;
+    border-radius: 999px;
+    font-size: 0.93rem;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    margin-right: 0.5rem;
+    background: #e9d8fd;
+    color: #764ba2;
+    box-shadow: 0 1px 2px rgba(118, 75, 162, 0.07);
+}
+#dashboardInfoBox .scheduled-call-card .call-status.completed {
+    background: #d1fae5;
+    color: #059669;
+}
+#dashboardInfoBox .scheduled-call-card .call-status.cancelled {
+    background: #fee2e2;
+    color: #dc2626;
+}
+#dashboardInfoBox .scheduled-call-card .btn-edit-call {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.45em 1.2em;
+    font-size: 0.98rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.3rem;
+    transition: background 0.2s, box-shadow 0.2s;
+    box-shadow: 0 1px 4px rgba(102, 126, 234, 0.10);
+}
+#dashboardInfoBox .scheduled-call-card .btn-edit-call:hover {
+    background: linear-gradient(135deg, #5a67d8 0%, #6b21a8 100%);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.16);
+}
+#dashboardInfoBox .scheduled-call-card .btn-delete-call {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.45em 1.2em;
+    font-size: 0.98rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.3rem;
+    transition: background 0.2s, box-shadow 0.2s;
+    box-shadow: 0 1px 4px rgba(239, 68, 68, 0.10);
+}
+#dashboardInfoBox .scheduled-call-card .btn-delete-call:hover {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.16);
+}
+#dashboardInfoBox .scheduled-call-card .btn-delete-call:disabled {
+    background: #e5e7eb;
+    color: #a1a1aa;
+    cursor: not-allowed;
+    box-shadow: none;
+    opacity: 0.7;
+    border: none;
 }

@@ -5,11 +5,22 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
+const cron = require('node-cron');
+const twilio = require('twilio');
+const { VoiceResponse } = require('twilio').twiml;
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+
+const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+
+const RENDER_BASE_URL = process.env.RENDER_BASE_URL || 'https://final-x03c.onrender.com';
 
 // Middleware
 app.use(cors());
@@ -565,6 +576,198 @@ app.post('/api/questions/reorder', authenticateToken, (req, res) => {
     } catch (error) {
         console.error('Reorder questions error:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+// --- Call Scheduling Utilities ---
+function loadCalls() {
+    try {
+        const data = fs.readFileSync('calls.json', 'utf8');
+        return data.trim() ? JSON.parse(data) : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveCalls(calls) {
+    try {
+        fs.writeFileSync('calls.json', JSON.stringify(calls, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Error saving calls:', error);
+        return false;
+    }
+}
+
+// Schedule a call
+app.post('/api/schedule-call', authenticateToken, (req, res) => {
+    const { name, phone, scheduledTime } = req.body;
+    if (!name || !phone || !scheduledTime) {
+        return res.status(400).json({ success: false, message: 'Name, phone, and scheduledTime are required.' });
+    }
+    try {
+        const calls = loadCalls();
+        const newCall = {
+            id: calls.length > 0 ? Math.max(...calls.map(c => c.id)) + 1 : 1,
+            userId: req.user.userId,
+            name,
+            phone,
+            scheduledTime,
+            status: 'scheduled'
+        };
+        calls.push(newCall);
+        if (saveCalls(calls)) {
+            res.status(201).json({ success: true, message: 'Call scheduled successfully.', call: newCall });
+        } else {
+            throw new Error('Failed to save call.');
+        }
+    } catch (error) {
+        console.error('Schedule call error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+// Edit a scheduled call
+app.put('/api/scheduled-calls/:id', authenticateToken, (req, res) => {
+    const callId = parseInt(req.params.id, 10);
+    const { name, phone, scheduledTime, status } = req.body;
+    try {
+        const calls = loadCalls();
+        const callIndex = calls.findIndex(call => call.id === callId && call.userId === req.user.userId);
+        if (callIndex === -1) {
+            return res.status(404).json({ success: false, message: 'Call not found.' });
+        }
+        // Update fields if provided
+        if (name) calls[callIndex].name = name;
+        if (phone) calls[callIndex].phone = phone;
+        if (scheduledTime) calls[callIndex].scheduledTime = scheduledTime;
+        if (status) calls[callIndex].status = status;
+        if (saveCalls(calls)) {
+            res.json({ success: true, message: 'Call updated successfully.', call: calls[callIndex] });
+        } else {
+            throw new Error('Failed to update call.');
+        }
+    } catch (error) {
+        console.error('Edit call error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+// Get scheduled calls for the logged-in user
+app.get('/api/scheduled-calls', authenticateToken, (req, res) => {
+    try {
+        const calls = loadCalls();
+        const userCalls = calls.filter(call => call.userId === req.user.userId);
+        res.json({ success: true, calls: userCalls });
+    } catch (error) {
+        console.error('Fetch scheduled calls error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+// Delete a scheduled call
+app.delete('/api/scheduled-calls/:id', authenticateToken, (req, res) => {
+    const callId = parseInt(req.params.id, 10);
+    try {
+        const calls = loadCalls();
+        const callIndex = calls.findIndex(call => call.id === callId && call.userId === req.user.userId);
+        if (callIndex === -1) {
+            return res.status(404).json({ success: false, message: 'Call not found.' });
+        }
+        calls.splice(callIndex, 1);
+        if (saveCalls(calls)) {
+            res.json({ success: true, message: 'Call deleted successfully.' });
+        } else {
+            throw new Error('Failed to delete call.');
+        }
+    } catch (error) {
+        console.error('Delete call error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+// Twilio status callback endpoint
+app.post('/api/twilio-status-callback', express.urlencoded({ extended: false }), (req, res) => {
+    const { CallSid, CallStatus } = req.body;
+    if (!CallSid || !CallStatus) return res.sendStatus(400);
+
+    const calls = loadCalls();
+    const call = calls.find(c => c.twilioCallSid === CallSid);
+    if (call) {
+        if (CallStatus === 'completed') {
+            call.status = 'completed';
+        } else if ([ 'failed', 'busy', 'no-answer', 'canceled' ].includes(CallStatus)) {
+            call.status = 'failed';
+        }
+        saveCalls(calls);
+    }
+    res.sendStatus(200);
+});
+
+// TwiML endpoint to ask questions from questions.json
+app.post('/api/twilio-questions-voice', (req, res) => {
+    const questionsData = loadQuestions();
+    const questions = questionsData.questions || [];
+    const questionIndex = parseInt(req.query.q || '0', 10);
+
+    const twiml = new VoiceResponse();
+
+    if (questionIndex < questions.length) {
+        const gather = twiml.gather({
+            input: 'speech',
+            action: `/api/twilio-questions-voice?q=${questionIndex + 1}`,
+            method: 'POST',
+            timeout: 5
+        });
+        gather.say(questions[questionIndex].question);
+        twiml.say('We did not receive your answer.');
+        twiml.redirect(`/api/twilio-questions-voice?q=${questionIndex + 1}`);
+    } else {
+        twiml.say('Thank you for answering the questions. Goodbye!');
+        twiml.hangup();
+    }
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+});
+
+// --- Twilio Call Scheduler ---
+cron.schedule('* * * * *', async () => {
+    const calls = loadCalls();
+    let updated = false;
+    const now = new Date();
+    for (const call of calls) {
+        if (
+            call.status === 'scheduled' &&
+            call.scheduledTime &&
+            new Date(call.scheduledTime) <= now &&
+            call.phone &&
+            !call.twilioCallSid // Only call if not already called
+        ) {
+            try {
+                // Place the call using Twilio
+                const twilioCall = await twilioClient.calls.create({
+                    url: `${RENDER_BASE_URL}/api/twilio-questions-voice`,
+                    to: call.phone,
+                    from: TWILIO_PHONE_NUMBER,
+                    statusCallback: `${RENDER_BASE_URL}/api/twilio-status-callback`,
+                    statusCallbackEvent: ['completed', 'failed', 'busy', 'no-answer', 'canceled']
+                });
+                // Mark as in-progress until callback
+                call.status = 'in-progress';
+                call.twilioCallSid = twilioCall.sid;
+                updated = true;
+                console.log(`Twilio call placed to ${call.phone} (Call SID: ${twilioCall.sid})`);
+            } catch (err) {
+                console.error('Twilio call error:', err);
+                call.status = 'failed';
+                call.error = err.message;
+                updated = true;
+            }
+        }
+    }
+    if (updated) {
+        saveCalls(calls);
     }
 });
 
