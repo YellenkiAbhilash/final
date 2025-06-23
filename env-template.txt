@@ -12,7 +12,7 @@ BASE_URL=http://localhost:3000
 # Public URL for Twilio webhooks (REQUIRED for calls to work)
 # This must be a publicly accessible URL (not localhost)
 # Your deployed app URL:
-PUBLIC_URL=https://hr-automate.onrender.com
+PUBLIC_URL=https://hr-team23.onrender.com
 
 # JWT Secret
 JWT_SECRET=your-secret-key-change-in-production
@@ -25,4 +25,4 @@ SMTP_USER=your_email@gmail.com
 SMTP_PASS=your_app_password
 
 # Password Reset URL
-RESET_URL=http://localhost:3000 
+RESET_URL=https://hr-team23.onrender.com 

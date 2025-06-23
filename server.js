@@ -990,7 +990,7 @@ app.post('/api/direct-call', authenticateToken, async (req, res) => {
     }
     
     try {
-        const publicUrl = process.env.PUBLIC_URL || 'https://hr-automate.onrender.com';
+        const publicUrl = process.env.PUBLIC_URL || 'https://hr-team23.onrender.com';
         const twimlUrl = `${publicUrl}/twiml/ask`;
         console.log(`Making direct call to ${name} (${phone}) at ${twimlUrl}`);
         
@@ -1062,7 +1062,7 @@ app.post('/api/trigger-call/:callId', authenticateToken, async (req, res) => {
     }
     
     try {
-        const publicUrl = process.env.PUBLIC_URL || 'https://hr-automate.onrender.com';
+        const publicUrl = process.env.PUBLIC_URL || 'https://hr-team23.onrender.com';
         const twimlUrl = `${publicUrl}/twiml/ask`;
         console.log(`Manually triggering call to ${call.name} (${call.phone}) at ${twimlUrl}`);
         console.log(`IST Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
