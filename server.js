@@ -599,31 +599,46 @@ function saveCalls(calls) {
     }
 }
 
-// Schedule a call
+// Schedule a call for the logged-in user
 app.post('/api/schedule-call', authenticateToken, (req, res) => {
-    const { name, phone, scheduledTime } = req.body;
-    if (!name || !phone || !scheduledTime) {
-        return res.status(400).json({ success: false, message: 'Name, phone, and scheduledTime are required.' });
+    const { name, phone, time } = req.body;
+    if (!name || !phone || !time) {
+        return res.status(400).json({ success: false, message: 'All fields are required.' });
     }
+    
     try {
+        const usersData = loadUsers();
+        const user = usersData.users.find(u => u.id === req.user.userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+        
         const calls = loadCalls();
         const newCall = {
             id: calls.length > 0 ? Math.max(...calls.map(c => c.id)) + 1 : 1,
-            userId: req.user.userId,
+            userId: user.id,
             name,
             phone,
-            scheduledTime,
-            status: 'scheduled'
+            scheduledTime: time, // Use 'scheduledTime' for compatibility with the rest of your app
+            status: 'scheduled',
+            created_at: new Date().toISOString()
         };
+        
         calls.push(newCall);
-        if (saveCalls(calls)) {
-            res.status(201).json({ success: true, message: 'Call scheduled successfully.', call: newCall });
-        } else {
-            throw new Error('Failed to save call.');
-        }
+        saveCalls(calls);
+        
+        // If you have a scheduler, you can schedule the call here and return a jobId
+        // const jobId = callScheduler.scheduleCall(newCall);
+        
+        res.json({ 
+            success: true, 
+            message: 'Call scheduled successfully.', 
+            call: newCall
+            // jobId: jobId
+        });
     } catch (error) {
-        console.error('Schedule call error:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
+        console.error('Error scheduling call:', error);
+        res.status(500).json({ success: false, message: 'Failed to schedule call' });
     }
 });
 
