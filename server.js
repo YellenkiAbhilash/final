@@ -88,12 +88,20 @@ const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
 
 // Initialize Twilio client only if credentials are available
 let twilioClient = null;
-if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
-    twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-    console.log('Twilio client initialized successfully');
+if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_PHONE_NUMBER) {
+    if (TWILIO_ACCOUNT_SID === 'your_twilio_account_sid_here' || 
+        TWILIO_AUTH_TOKEN === 'your_twilio_auth_token_here' || 
+        TWILIO_PHONE_NUMBER === 'your_twilio_phone_number_here') {
+        console.warn('⚠️  Twilio credentials are placeholder values. Real calls will not be made.');
+        console.warn('📝 Please update your .env file with real Twilio credentials from https://console.twilio.com/');
+    } else {
+        twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+        console.log('✅ Twilio client initialized successfully with real credentials');
+    }
 } else {
-    console.warn('Twilio credentials not found. Call functionality will be disabled.');
-    console.warn('Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER environment variables.');
+    console.warn('⚠️  Twilio credentials not found. Call functionality will be disabled.');
+    console.warn('📝 Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER environment variables.');
+    console.warn('🔗 Get credentials from: https://console.twilio.com/');
 }
 
 // Add questions file and functions
