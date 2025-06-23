@@ -626,15 +626,15 @@ app.post('/api/schedule-call', authenticateToken, (req, res) => {
         
         calls.push(newCall);
         saveCalls(calls);
-        
-        // If you have a scheduler, you can schedule the call here and return a jobId
-        // const jobId = callScheduler.scheduleCall(newCall);
+
+        // Log scheduled call info in IST
+        const scheduledAtIST = new Date(time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        console.log(`Scheduled call: Name=${name}, Phone=${phone}, Scheduled Time=${scheduledAtIST} IST, UserId=${user.id}`);
         
         res.json({ 
             success: true, 
             message: 'Call scheduled successfully.', 
             call: newCall
-            // jobId: jobId
         });
     } catch (error) {
         console.error('Error scheduling call:', error);
