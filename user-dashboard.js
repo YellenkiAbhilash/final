@@ -483,10 +483,10 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const name = document.getElementById('callName').value.trim();
             const phone = document.getElementById('callPhone').value.trim();
-            const scheduledTime = document.getElementById('callTime').value;
+            const time = document.getElementById('callTime').value;
             const errorDiv = document.getElementById('scheduleCallError');
             errorDiv.textContent = '';
-            if (!name || !phone || !scheduledTime) {
+            if (!name || !phone || !time) {
                 errorDiv.textContent = 'All fields are required!';
                 return;
             }
@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ name, phone, scheduledTime })
+                    body: JSON.stringify({ name, phone, time })
                 });
                 const data = await response.json();
                 if (data.success) {
@@ -692,10 +692,10 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const name = document.getElementById('callName').value.trim();
             const phone = document.getElementById('callPhone').value.trim();
-            const scheduledTime = document.getElementById('callTime').value;
+            const time = document.getElementById('callTime').value;
             const errorDiv = document.getElementById('scheduleCallError');
             errorDiv.textContent = '';
-            if (!name || !phone || !scheduledTime) {
+            if (!name || !phone || !time) {
                 errorDiv.textContent = 'All fields are required!';
                 return;
             }
@@ -707,7 +707,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ name, phone, scheduledTime })
+                    body: JSON.stringify({ name, phone, time })
                 });
                 const data = await response.json();
                 if (data.success) {
