@@ -1046,3 +1046,25 @@ body {
     opacity: 0.7;
     border: none;
 }
+
+/* --- Test Call Button Styles --- */
+.test-call-btn {
+    background: linear-gradient(135deg, #10b981 0%, #22d3ee 100%);
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1.1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+    transition: background 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.10);
+}
+.test-call-btn:hover {
+    background: linear-gradient(135deg, #059669 0%, #0ea5e9 100%);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.16);
+}

@@ -721,4 +721,31 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    const testCallBtn = document.getElementById('testCallBtn');
+    if (testCallBtn) {
+        testCallBtn.addEventListener('click', async function() {
+            let phone = prompt('Enter the phone number to test (in E.164 format, e.g., +1234567890):');
+            if (!phone) return;
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/test-call', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ phone })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showNotification('Test call initiated!', 'success');
+                } else {
+                    showNotification(data.message || 'Failed to initiate test call.', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to initiate test call. Please try again.', 'error');
+            }
+        });
+    }
 }); 

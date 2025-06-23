@@ -771,6 +771,25 @@ cron.schedule('* * * * *', async () => {
     }
 });
 
+// Test Call Endpoint
+app.post('/api/test-call', authenticateToken, async (req, res) => {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ success: false, message: 'Phone number is required.' });
+    try {
+        const twilioCall = await twilioClient.calls.create({
+            url: `${RENDER_BASE_URL}/api/twilio-questions-voice`,
+            to: phone,
+            from: TWILIO_PHONE_NUMBER,
+            statusCallback: `${RENDER_BASE_URL}/api/twilio-status-callback`,
+            statusCallbackEvent: ['completed', 'failed', 'busy', 'no-answer', 'canceled']
+        });
+        res.json({ success: true, message: 'Test call initiated.', callSid: twilioCall.sid });
+    } catch (err) {
+        console.error('Test call error:', err);
+        res.status(500).json({ success: false, message: 'Failed to initiate test call.' });
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
