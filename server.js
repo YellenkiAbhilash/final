@@ -825,14 +825,6 @@ app.get('/api/questions', authenticateToken, (req, res) => {
     try {
         console.log('🔍 Questions API called by user:', req.user.email, 'role:', req.user.role);
         
-        if (req.user.role !== 'admin') {
-            console.log('❌ Access denied - user is not admin');
-            return res.status(403).json({ 
-                success: false, 
-                message: 'Only admins can view questions' 
-            });
-        }
-
         console.log('📁 Loading questions from file:', questionsFile);
         const questions = loadQuestions();
         console.log('📊 Loaded questions:', questions);
@@ -853,13 +845,8 @@ app.get('/api/questions', authenticateToken, (req, res) => {
 // Update questions
 app.put('/api/questions', authenticateToken, (req, res) => {
     try {
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({ 
-                success: false, 
-                message: 'Only admins can update questions' 
-            });
-        }
-
+        console.log('🔍 Questions update API called by user:', req.user.email, 'role:', req.user.role);
+        
         const { questions } = req.body;
 
         if (!questions || !Array.isArray(questions)) {
@@ -880,7 +867,7 @@ app.put('/api/questions', authenticateToken, (req, res) => {
         }
 
         if (saveQuestions(validQuestions)) {
-            console.log(`📝 Questions updated successfully: ${validQuestions.length} questions`);
+            console.log(`📝 Questions updated successfully by ${req.user.email}: ${validQuestions.length} questions`);
             res.json({ 
                 success: true, 
                 message: 'Questions updated successfully',
@@ -893,7 +880,7 @@ app.put('/api/questions', authenticateToken, (req, res) => {
             });
         }
     } catch (error) {
-        console.error('Error updating questions:', error);
+        console.error('❌ Error updating questions:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Failed to update questions: ' + error.message 

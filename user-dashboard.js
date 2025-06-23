@@ -331,44 +331,70 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Helper to render the questions management UI
     function renderQuestionsBox(questions) {
-        let html = `<div style='margin-bottom:1rem;'>
-            <button id='addQuestionBtn' style='background: #667eea; color: white; border: none; padding: 0.5rem 1.2rem; border-radius: 8px; font-weight: 600; cursor: pointer;'>Add Question</button>
+        let html = `<div style='margin-bottom:1rem; display: flex; gap: 0.5rem; align-items: center;'>
+            <button id='addQuestionBtn' style='background: #667eea; color: white; border: none; padding: 0.5rem 1.2rem; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;'>
+                <i class="fas fa-plus"></i> Add Question
+            </button>
+            <button id='saveAllQuestionsBtn' style='background: #10b981; color: white; border: none; padding: 0.5rem 1.2rem; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;'>
+                <i class="fas fa-save"></i> Save All
+            </button>
         </div>`;
-        html += `<ul id='questionsList'>`;
-        questions.forEach((q, idx) => {
-            html += `<li style='margin-bottom:0.5rem;'>
-                <input type='text' value="${q}" data-idx='${idx}' class='question-input' style='width:60%; padding:0.3rem; border-radius:6px; border:1px solid #e5e7eb;'>
-                <button class='saveQuestionBtn' data-idx='${idx}' style='margin-left:0.5rem;'>Save</button>
-                <button class='deleteQuestionBtn' data-idx='${idx}' style='margin-left:0.5rem; color:#ef4444;'>Delete</button>
-            </li>`;
-        });
-        html += `</ul>`;
+        
+        if (questions.length === 0) {
+            html += `<div style='color: #6b7280; font-style: italic; margin: 1rem 0;'>No questions defined. Add some questions to get started.</div>`;
+        } else {
+            html += `<div id='questionsList'>`;
+            questions.forEach((q, idx) => {
+                html += `<div style='margin-bottom:0.8rem; padding: 0.8rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb;'>
+                    <div style='display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;'>
+                        <span style='font-weight: 600; color: #374151;'>${idx + 1}.</span>
+                        <input type='text' value="${q}" data-idx='${idx}' class='question-input' style='flex: 1; padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db; font-size: 0.9rem;' placeholder='Enter question text...'>
+                    </div>
+                    <div style='display: flex; gap: 0.5rem; justify-content: flex-end;'>
+                        <button class='deleteQuestionBtn' data-idx='${idx}' style='background: #ef4444; color: white; border: none; padding: 0.3rem 0.8rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;'>
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>`;
+            });
+            html += `</div>`;
+        }
+        
         infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-question'></i> Manage Questions</div><div class='info-box-content'>${html}</div>`;
 
         // Add event listeners
-        document.getElementById('addQuestionBtn').onclick = () => {
-            // Add a new empty question field to the list and re-render
-            const updated = [...questions, ""];
-            renderQuestionsBox(updated);
-        };
-        document.querySelectorAll('.saveQuestionBtn').forEach(btn => {
-            btn.onclick = async (e) => {
-                const idx = parseInt(btn.dataset.idx);
-                const val = document.querySelector(`.question-input[data-idx='${idx}']`).value.trim();
-                if (val) {
-                    const updated = [...questions];
-                    updated[idx] = val;
-                    await updateQuestions(updated);
-                } else {
-                    showNotification('Question cannot be empty', 'error');
-                }
+        const addQuestionBtn = document.getElementById('addQuestionBtn');
+        const saveAllQuestionsBtn = document.getElementById('saveAllQuestionsBtn');
+        
+        if (addQuestionBtn) {
+            addQuestionBtn.onclick = () => {
+                const updated = [...questions, "New question"];
+                renderQuestionsBox(updated);
             };
-        });
+        }
+        
+        if (saveAllQuestionsBtn) {
+            saveAllQuestionsBtn.onclick = async () => {
+                const questionInputs = document.querySelectorAll('.question-input');
+                const updatedQuestions = Array.from(questionInputs).map(input => input.value.trim()).filter(q => q !== '');
+                
+                if (updatedQuestions.length === 0) {
+                    showNotification('Please add at least one question before saving.', 'error');
+                    return;
+                }
+                
+                await updateQuestions(updatedQuestions);
+            };
+        }
+        
         document.querySelectorAll('.deleteQuestionBtn').forEach(btn => {
             btn.onclick = async (e) => {
-                const idx = parseInt(btn.dataset.idx);
-                const updated = questions.filter((_, i) => i !== idx);
-                await updateQuestions(updated);
+                const confirmed = confirm('Are you sure you want to delete this question?');
+                if (confirmed) {
+                    const idx = parseInt(btn.dataset.idx);
+                    const updated = questions.filter((_, i) => i !== idx);
+                    await updateQuestions(updated);
+                }
             };
         });
     }
@@ -377,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function updateQuestions(newQuestions) {
         try {
             const response = await fetch('/api/questions', {
-                method: 'POST',
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
@@ -387,11 +413,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             if (response.ok && data.success) {
                 renderQuestionsBox(data.questions);
-                showNotification('Questions updated!', 'success');
+                showNotification('Questions updated successfully!', 'success');
             } else {
                 showNotification(data.message || 'Failed to update questions', 'error');
             }
         } catch (err) {
+            console.error('Error updating questions:', err);
             showNotification('Network error. Please try again.', 'error');
         }
     }

@@ -6,8 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Token exists:', !!token);
     console.log('User:', user);
     
-    // Check for token and admin role
-    if (!token || !user || user.role !== 'admin') {
+    // Check for token and user role
+    if (!token || !user) {
         window.location.href = 'index.html';
         return;
     }
