@@ -375,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             
-            console.log('Response status:', response.status);
+            console.log('Calls response status:', response.status);
             
             if (!response.ok) {
                 const errorText = await response.text();
@@ -386,48 +386,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             console.log('Calls data received:', data);
             
-            const callsTableBody = document.querySelector('#callsTable tbody');
-            if (!callsTableBody) {
-                console.error('Calls table body not found!');
-                return;
-            }
-            
-            callsTableBody.innerHTML = '';
-            
             if (!data.calls || data.calls.length === 0) {
-                callsTableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;">No calls found</td></tr>';
+                const callsTableBody = document.querySelector('#callsTable tbody');
+                if (callsTableBody) {
+                    callsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No calls found</td></tr>';
+                }
                 return;
             }
             
-            data.calls.forEach(call => {
-                const row = document.createElement('tr');
-                const status = call.completed ? 'completed' : call.failed ? 'failed' : 'pending';
-                const statusText = call.completed ? 'Completed' : call.failed ? 'Failed' : 'Pending';
-                
-                row.innerHTML = `
-                    <td>${call.id}</td>
-                    <td>${call.userId || 'N/A'}</td>
-                    <td>${call.name}</td>
-                    <td>${call.phone}</td>
-                    <td>${new Date(call.time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
-                    <td><span class="status-badge ${status}">${statusText}</span></td>
-                    <td>${call.duration || 'N/A'}</td>
-                    <td>${call.recording_url ? '<a href="' + call.recording_url + '" target="_blank">Listen</a>' : 'N/A'}</td>
-                    <td>
-                        <button class="individual-download-btn" onclick="downloadCallReport('${call.id}')">
-                            <i class="fas fa-download"></i> Download
-                        </button>
-                    </td>
-                `;
-                callsTableBody.appendChild(row);
-            });
+            // Use the displayCalls function that includes edit/delete buttons
+            displayCalls(data.calls);
             
             console.log(`Loaded ${data.calls.length} calls successfully`);
         } catch (error) {
             console.error('Error loading calls:', error);
             const callsTableBody = document.querySelector('#callsTable tbody');
             if (callsTableBody) {
-                callsTableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: red;">Error loading calls: ${error.message}</td></tr>`;
+                callsTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: red;">Error loading calls: ${error.message}</td></tr>`;
             }
         }
     };
@@ -1380,4 +1355,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load questions on page load
     loadQuestions();
+
+    // Make functions globally accessible for onclick handlers
+    window.editCall = editCall;
+    window.deleteCall = deleteCall;
+    window.triggerCall = triggerCall;
+    window.downloadCallReport = downloadCallReport;
 }); 
