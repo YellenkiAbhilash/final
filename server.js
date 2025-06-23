@@ -710,40 +710,31 @@ class CallScheduler {
                 throw new Error('No questions defined');
             }
             
-            // Create TwiML for the call
-            const twiml = new twilio.twiml.VoiceResponse();
+            // Use webhook URL approach instead of inline TwiML
+            const publicUrl = process.env.PUBLIC_URL || 'https://hr-team23.onrender.com';
+            const twimlUrl = `${publicUrl}/twiml/ask`;
+            const statusCallbackUrl = `${publicUrl}/call-status`;
+            console.log(`Using TwiML webhook URL: ${twimlUrl}`);
+            console.log(`Using status callback URL: ${statusCallbackUrl}`);
             
-            // Add greeting
-            twiml.say('Hello, this is an automated call. Please answer the following questions.');
-            
-            // Add questions with gather
-            questions.forEach((question, index) => {
-                twiml.say(question);
-                twiml.gather({
-                    input: 'speech',
-                    timeout: 10,
-                    action: `/handle-response?question=${index + 1}&callId=${callData.id}`,
-                    method: 'POST'
-                });
-            });
-            
-            twiml.say('Thank you for your responses. Goodbye!');
-            
-            // Make the call using Twilio
+            // Make the call using Twilio with webhook URL
             const twilioCall = await twilioClient.calls.create({
-                twiml: twiml.toString(),
+                url: twimlUrl,
                 to: callData.phone,
-                from: this.twilioPhoneNumber
+                from: this.twilioPhoneNumber,
+                statusCallback: statusCallbackUrl,
+                statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+                statusCallbackMethod: 'POST'
             });
             
-            console.log(`✅ Call completed for ${callData.name} with SID: ${twilioCall.sid}`);
+            console.log(`✅ Call initiated for ${callData.name} with SID: ${twilioCall.sid}`);
             
-            // Update call status
+            // Update call status to in progress
             const callsData = loadCalls();
             const callIndex = callsData.calls.findIndex(c => c.id === callData.id);
             if (callIndex !== -1) {
-                callsData.calls[callIndex].completed = true;
-                callsData.calls[callIndex].completed_at = new Date().toISOString();
+                callsData.calls[callIndex].status = 'In Progress';
+                callsData.calls[callIndex].started_at = new Date().toISOString();
                 callsData.calls[callIndex].twilio_call_sid = twilioCall.sid;
                 saveCalls(callsData);
             }
@@ -970,55 +961,99 @@ app.get('/test-twiml', (req, res) => {
 
 // TwiML webhook to ask questions and collect responses
 app.post('/twiml/ask', express.urlencoded({ extended: false }), (req, res) => {
-    const callSid = req.body.CallSid;
-    const digits = req.body.SpeechResult || req.body.Digits;
-    const questionIndex = parseInt(req.query.questionIndex || req.body.questionIndex || '0', 10);
-    const questions = loadQuestions();
-    let responses = loadResponses();
-    
-    console.log(`TwiML Request - CallSid: ${callSid}, QuestionIndex: ${questionIndex}, Response: ${digits}`);
-    
-    let callResponse = responses.find(r => r.callSid === callSid);
-    if (!callResponse) {
-        callResponse = { callSid, answers: [], timestamp: new Date().toISOString() };
-        responses.push(callResponse);
-    }
-    
-    // Store response if present and not first question
-    if (callSid && digits !== undefined && questionIndex > 0) {
-        callResponse.answers[questionIndex - 1] = digits;
-        saveResponses(responses);
-        console.log(`Stored response for question ${questionIndex - 1}: ${digits}`);
-    }
-    
-    const response = new VoiceResponse();
-    
-    if (questionIndex < questions.length) {
-        // Ask the current question
-        const gather = response.gather({
-            input: 'speech dtmf',
-            numDigits: 1,
-            action: `/twiml/ask?questionIndex=${questionIndex + 1}`,
-            method: 'POST',
-            timeout: 10,
-            speechTimeout: 'auto'
-        });
+    try {
+        const callSid = req.body.CallSid;
+        const digits = req.body.SpeechResult || req.body.Digits;
+        const questionIndex = parseInt(req.query.questionIndex || req.body.questionIndex || '0', 10);
+        const questions = loadQuestions();
+        let responses = loadResponses();
         
-        gather.say(`Question ${questionIndex + 1}: ${questions[questionIndex]}`);
-        console.log(`Asking question ${questionIndex + 1}: ${questions[questionIndex]}`);
+        console.log(`📞 TwiML Request - CallSid: ${callSid}, QuestionIndex: ${questionIndex}, Response: ${digits}`);
         
-        // If no response, repeat the question
-        response.say(`Question ${questionIndex + 1}: ${questions[questionIndex]}`);
-        response.redirect({ method: 'POST' }, `/twiml/ask?questionIndex=${questionIndex}`);
-    } else {
-        // All questions completed
-        response.say('Thank you for your responses. Goodbye!');
+        // Validate questions exist
+        if (!questions || questions.length === 0) {
+            console.error('❌ No questions found in questions.json');
+            const response = new VoiceResponse();
+            response.say('Sorry, there are no questions configured. Please contact the administrator.');
+            response.hangup();
+            res.type('text/xml');
+            return res.send(response.toString());
+        }
+        
+        let callResponse = responses.find(r => r.callSid === callSid);
+        if (!callResponse) {
+            callResponse = { 
+                callSid, 
+                answers: new Array(questions.length).fill(''), 
+                confidences: new Array(questions.length).fill(0),
+                timestamp: new Date().toISOString() 
+            };
+            responses.push(callResponse);
+        }
+        
+        // Store response if present and not first question
+        if (callSid && digits !== undefined && questionIndex > 0) {
+            callResponse.answers[questionIndex - 1] = digits;
+            callResponse.confidences[questionIndex - 1] = parseFloat(req.body.Confidence) || 0;
+            saveResponses(responses);
+            console.log(`💾 Stored response for question ${questionIndex - 1}: ${digits}`);
+        }
+        
+        const response = new VoiceResponse();
+        
+        if (questionIndex === 0) {
+            // First time - greeting
+            response.say('Hello, this is an automated call. Please answer the following questions.');
+            response.redirect({ method: 'POST' }, `/twiml/ask?questionIndex=1`);
+        } else if (questionIndex <= questions.length) {
+            // Ask the current question
+            const gather = response.gather({
+                input: 'speech dtmf',
+                numDigits: 1,
+                action: `/twiml/ask?questionIndex=${questionIndex + 1}`,
+                method: 'POST',
+                timeout: 15,
+                speechTimeout: 'auto'
+            });
+            
+            gather.say(`Question ${questionIndex}: ${questions[questionIndex - 1]}`);
+            console.log(`❓ Asking question ${questionIndex}: ${questions[questionIndex - 1]}`);
+            
+            // If no response, repeat the question
+            response.say(`Question ${questionIndex}: ${questions[questionIndex - 1]}`);
+            response.redirect({ method: 'POST' }, `/twiml/ask?questionIndex=${questionIndex}`);
+        } else {
+            // All questions completed
+            response.say('Thank you for your responses. Goodbye!');
+            response.hangup();
+            console.log(`✅ Call completed for CallSid: ${callSid}`);
+            
+            // Update call status to completed
+            const callsData = loadCalls();
+            const call = callsData.calls.find(c => c.twilio_call_sid === callSid);
+            if (call) {
+                call.completed = true;
+                call.completed_at = new Date().toISOString();
+                call.status = 'Completed';
+                saveCalls(callsData);
+                console.log(`✅ Updated call ${call.id} status to completed`);
+            }
+        }
+        
+        res.type('text/xml');
+        res.send(response.toString());
+        
+    } catch (error) {
+        console.error('❌ Error in TwiML webhook:', error);
+        
+        // Send a safe TwiML response
+        const response = new VoiceResponse();
+        response.say('Sorry, there was an error processing your call. Please try again later.');
         response.hangup();
-        console.log(`Call completed for CallSid: ${callSid}`);
+        
+        res.type('text/xml');
+        res.send(response.toString());
     }
-    
-    res.type('text/xml');
-    res.send(response.toString());
 });
 
 // Direct call endpoint - make call immediately
@@ -1041,13 +1076,17 @@ app.post('/api/direct-call', authenticateToken, async (req, res) => {
     try {
         const publicUrl = process.env.PUBLIC_URL || 'https://hr-team23.onrender.com';
         const twimlUrl = `${publicUrl}/twiml/ask`;
+        const statusCallbackUrl = `${publicUrl}/call-status`;
         console.log(`Making direct call to ${name} (${phone}) at ${twimlUrl}`);
         
         // Make the call immediately
         const call = await twilioClient.calls.create({
             url: twimlUrl,
             to: phone,
-            from: TWILIO_PHONE_NUMBER
+            from: TWILIO_PHONE_NUMBER,
+            statusCallback: statusCallbackUrl,
+            statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+            statusCallbackMethod: 'POST'
         });
         
         // Save call record for tracking
@@ -1113,13 +1152,17 @@ app.post('/api/trigger-call/:callId', authenticateToken, async (req, res) => {
     try {
         const publicUrl = process.env.PUBLIC_URL || 'https://hr-team23.onrender.com';
         const twimlUrl = `${publicUrl}/twiml/ask`;
+        const statusCallbackUrl = `${publicUrl}/call-status`;
         console.log(`Manually triggering call to ${call.name} (${call.phone}) at ${twimlUrl}`);
         console.log(`IST Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
         
         await twilioClient.calls.create({
             url: twimlUrl,
             to: call.phone,
-            from: TWILIO_PHONE_NUMBER
+            from: TWILIO_PHONE_NUMBER,
+            statusCallback: statusCallbackUrl,
+            statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+            statusCallbackMethod: 'POST'
         });
         
         call.completed = true;
@@ -1204,6 +1247,46 @@ app.get('/api/scheduler/status', authenticateToken, (req, res) => {
     } catch (error) {
         console.error('Error getting scheduler status:', error);
         res.status(500).json({ success: false, message: 'Failed to get scheduler status' });
+    }
+});
+
+// Call status callback endpoint
+app.post('/call-status', express.urlencoded({ extended: false }), (req, res) => {
+    try {
+        const { CallSid, CallStatus, CallDuration, RecordingUrl } = req.body;
+        
+        console.log(`📞 Call status update for CallSid: ${CallSid}`);
+        console.log(`   Status: ${CallStatus}`);
+        console.log(`   Duration: ${CallDuration} seconds`);
+        console.log(`   Recording URL: ${RecordingUrl}`);
+        
+        // Update call record with status information
+        const callsData = loadCalls();
+        const call = callsData.calls.find(c => c.twilio_call_sid === CallSid);
+        
+        if (call) {
+            call.call_status = CallStatus;
+            call.call_duration = CallDuration;
+            call.recording_url = RecordingUrl;
+            call.status_updated_at = new Date().toISOString();
+            
+            // Mark as completed if call ended
+            if (CallStatus === 'completed' || CallStatus === 'busy' || CallStatus === 'no-answer' || CallStatus === 'failed') {
+                call.completed = true;
+                call.completed_at = new Date().toISOString();
+                call.status = CallStatus === 'completed' ? 'Completed' : 'Failed';
+            }
+            
+            saveCalls(callsData);
+            console.log(`✅ Updated call ${call.id} with status: ${CallStatus}`);
+        } else {
+            console.log(`⚠️  Call not found for CallSid: ${CallSid}`);
+        }
+        
+        res.status(200).send('OK');
+    } catch (error) {
+        console.error('❌ Error handling call status:', error);
+        res.status(500).send('Error');
     }
 });
 
