@@ -306,9 +306,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-calendar-check'></i> Scheduled Calls</div><div class='info-box-content'>Network error. Please try again.</div>`;
             }
         });
-        if (statCards[2]) statCards[2].addEventListener('click', () => {
-            // Report logic
-            infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-file-alt'></i> Report</div><div class='info-box-content'>Your report will appear here. (Feature coming soon!)</div>`;
+        if (statCards[2]) statCards[2].addEventListener('click', async () => {
+            // Report logic - Show user's actual reports
+            infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-file-alt'></i> Report</div><div class='info-box-content'>Loading your reports...</div>`;
+            
+            try {
+                // Fetch user's responses and calls data
+                const [responsesResponse, callsResponse] = await Promise.all([
+                    fetch('/api/responses', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch('/api/calls', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                ]);
+
+                const responsesData = await responsesResponse.json();
+                const callsData = await callsResponse.json();
+
+                if (responsesResponse.ok && callsResponse.ok) {
+                    renderUserReports(responsesData.responses || [], callsData.calls || []);
+                } else {
+                    infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-file-alt'></i> Report</div><div class='info-box-content'>Failed to load reports. Please try again.</div>`;
+                }
+            } catch (err) {
+                console.error('Error loading reports:', err);
+                infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-file-alt'></i> Report</div><div class='info-box-content'>Network error. Please try again.</div>`;
+            }
         });
         if (statCards[3]) statCards[3].addEventListener('click', async () => {
             // Manage Questions logic
@@ -327,6 +351,190 @@ document.addEventListener('DOMContentLoaded', function() {
                 infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-question'></i> Manage Questions</div><div class='info-box-content'>Network error. Please try again.</div>`;
             }
         });
+    }
+
+    // Helper to render user reports with responses
+    function renderUserReports(responses, calls) {
+        const userId = getCurrentUserId();
+        const userResponses = responses.filter(r => {
+            const call = calls.find(c => c.twilio_call_sid === r.callSid);
+            return call && call.userId === userId;
+        });
+        
+        const userCalls = calls.filter(c => c.userId === userId);
+        
+        if (userResponses.length === 0 && userCalls.length === 0) {
+            infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-file-alt'></i> Report</div><div class='info-box-content'>
+                <div style='text-align: center; padding: 2rem; color: #6b7280;'>
+                    <i class='fas fa-chart-line' style='font-size: 3rem; margin-bottom: 1rem; display: block;'></i>
+                    <h3 style='margin: 0 0 0.5rem 0;'>No Reports Available</h3>
+                    <p style='margin: 0;'>You haven't made any calls yet. Schedule a call to see your reports here.</p>
+                </div>
+            </div>`;
+            return;
+        }
+        
+        // Calculate statistics
+        const totalCalls = userCalls.length;
+        const completedCalls = userCalls.filter(c => c.status === 'completed').length;
+        const pendingCalls = userCalls.filter(c => c.status === 'pending' || c.status === 'scheduled').length;
+        const totalResponses = userResponses.length;
+        const avgConfidence = userResponses.length > 0 
+            ? (userResponses.reduce((sum, r) => sum + (r.confidences?.reduce((a, b) => a + b, 0) / (r.confidences?.length || 1)), 0) / userResponses.length * 100).toFixed(1)
+            : 0;
+        
+        let html = `
+            <div style='margin-bottom: 2rem;'>
+                <h3 style='margin: 0 0 1rem 0; color: #1f2937;'>📊 Your Call Statistics</h3>
+                <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;'>
+                    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; border-radius: 8px; text-align: center;'>
+                        <div style='font-size: 1.5rem; font-weight: bold;'>${totalCalls}</div>
+                        <div style='font-size: 0.9rem; opacity: 0.9;'>Total Calls</div>
+                    </div>
+                    <div style='background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 1rem; border-radius: 8px; text-align: center;'>
+                        <div style='font-size: 1.5rem; font-weight: bold;'>${completedCalls}</div>
+                        <div style='font-size: 0.9rem; opacity: 0.9;'>Completed</div>
+                    </div>
+                    <div style='background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 1rem; border-radius: 8px; text-align: center;'>
+                        <div style='font-size: 1.5rem; font-weight: bold;'>${pendingCalls}</div>
+                        <div style='font-size: 0.9rem; opacity: 0.9;'>Pending</div>
+                    </div>
+                    <div style='background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; padding: 1rem; border-radius: 8px; text-align: center;'>
+                        <div style='font-size: 1.5rem; font-weight: bold;'>${totalResponses}</div>
+                        <div style='font-size: 0.9rem; opacity: 0.9;'>Responses</div>
+                    </div>
+                </div>
+                <div style='background: #f8fafc; padding: 1rem; border-radius: 8px; border-left: 4px solid #667eea;'>
+                    <div style='font-weight: 600; color: #374151; margin-bottom: 0.5rem;'>🎯 Average Confidence Score</div>
+                    <div style='font-size: 1.2rem; color: #667eea; font-weight: bold;'>${avgConfidence}%</div>
+                </div>
+            </div>
+        `;
+        
+        // Recent responses section
+        if (userResponses.length > 0) {
+            html += `
+                <div style='margin-bottom: 2rem;'>
+                    <h3 style='margin: 0 0 1rem 0; color: #1f2937;'>📝 Recent Call Responses</h3>
+                    <div style='max-height: 300px; overflow-y: auto;'>
+            `;
+            
+            userResponses.slice(0, 5).forEach((response, index) => {
+                const call = calls.find(c => c.twilio_call_sid === response.callSid);
+                const responseDate = new Date(response.timestamp).toLocaleDateString('en-IN', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                const avgConfidence = response.confidences?.length > 0 
+                    ? (response.confidences.reduce((a, b) => a + b, 0) / response.confidences.length * 100).toFixed(1)
+                    : 0;
+                
+                const confidenceColor = avgConfidence >= 80 ? '#10b981' : avgConfidence >= 60 ? '#f59e0b' : '#ef4444';
+                const confidenceText = avgConfidence >= 80 ? 'High' : avgConfidence >= 60 ? 'Medium' : 'Low';
+                
+                html += `
+                    <div style='background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; margin-bottom: 0.8rem;'>
+                        <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;'>
+                            <div style='font-weight: 600; color: #374151;'>Response #${index + 1}</div>
+                            <div style='display: flex; align-items: center; gap: 0.5rem;'>
+                                <span style='background: ${confidenceColor}; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600;'>${confidenceText}</span>
+                                <span style='color: #6b7280; font-size: 0.9rem;'>${responseDate}</span>
+                            </div>
+                        </div>
+                        <div style='color: #6b7280; font-size: 0.9rem; margin-bottom: 0.5rem;'>
+                            ${call ? `To: ${call.name} (${call.phone})` : 'Call details not available'}
+                        </div>
+                        <div style='font-size: 0.9rem; color: #374151;'>
+                            <strong>Questions Answered:</strong> ${response.answers?.length || 0}
+                        </div>
+                        <button onclick="viewResponseDetails('${response.id}')" style='
+                            background: #667eea; color: white; border: none; padding: 0.5rem 1rem; 
+                            border-radius: 6px; font-size: 0.9rem; cursor: pointer; margin-top: 0.5rem;
+                            display: flex; align-items: center; gap: 0.3rem;
+                        '>
+                            <i class="fas fa-eye"></i> View Details
+                        </button>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                    ${userResponses.length > 5 ? `<div style='text-align: center; margin-top: 1rem;'><button onclick="loadAllResponses()" style='background: #667eea; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;'>View All Responses</button></div>` : ''}
+                </div>
+            `;
+        }
+        
+        // Recent calls section
+        if (userCalls.length > 0) {
+            html += `
+                <div>
+                    <h3 style='margin: 0 0 1rem 0; color: #1f2937;'>📞 Recent Calls</h3>
+                    <div style='max-height: 200px; overflow-y: auto;'>
+            `;
+            
+            userCalls.slice(0, 3).forEach((call, index) => {
+                const callDate = new Date(call.scheduledTime).toLocaleDateString('en-IN', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                const statusColor = call.status === 'completed' ? '#10b981' : call.status === 'failed' ? '#ef4444' : '#f59e0b';
+                
+                html += `
+                    <div style='background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; margin-bottom: 0.8rem;'>
+                        <div style='display: flex; justify-content: space-between; align-items: center;'>
+                            <div>
+                                <div style='font-weight: 600; color: #374151;'>${call.name}</div>
+                                <div style='color: #6b7280; font-size: 0.9rem;'>${call.phone}</div>
+                            </div>
+                            <div style='text-align: right;'>
+                                <span style='background: ${statusColor}; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; text-transform: capitalize;'>${call.status}</span>
+                                <div style='color: #6b7280; font-size: 0.9rem; margin-top: 0.2rem;'>${callDate}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        infoBox.innerHTML = `<div class='info-box-title'><i class='fas fa-file-alt'></i> Report</div><div class='info-box-content'>${html}</div>`;
+    }
+
+    // Helper to get current user ID from token
+    function getCurrentUserId() {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return null;
+            
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            return payload.userId;
+        } catch (err) {
+            console.error('Error parsing token:', err);
+            return null;
+        }
+    }
+
+    // Function to view response details (placeholder - can be expanded)
+    function viewResponseDetails(responseId) {
+        showNotification('Response details feature coming soon!', 'info');
+    }
+
+    // Function to load all responses (placeholder - can be expanded)
+    function loadAllResponses() {
+        showNotification('Loading all responses...', 'info');
     }
 
     // Helper to render the questions management UI
@@ -616,4 +824,8 @@ document.addEventListener('DOMContentLoaded', function() {
             showNotification('Network error. Please try again.', 'error');
         }
     };
+
+    // Make functions globally accessible for onclick handlers
+    window.viewResponseDetails = viewResponseDetails;
+    window.loadAllResponses = loadAllResponses;
 }); 
