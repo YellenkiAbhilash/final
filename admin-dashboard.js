@@ -1175,14 +1175,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadQuestions() {
         try {
             console.log('🔍 Loading questions...');
+            console.log('Token:', token ? 'Present' : 'Missing');
+            
             const response = await fetch('/api/questions', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
             
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+            
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                console.error('Response error text:', errorText);
+                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
             }
             
             const data = await response.json();
@@ -1190,6 +1197,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (data.success && data.questions) {
                 questions = data.questions;
+                console.log('✅ Questions loaded successfully:', questions);
                 displayQuestions();
             } else {
                 console.error('❌ Failed to load questions:', data.message);
@@ -1198,6 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('❌ Error loading questions:', error);
+            console.error('Error details:', error.stack);
             questions = [];
             displayQuestions();
         }
@@ -1206,6 +1215,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Display questions
     function displayQuestions() {
         const questionsList = document.getElementById('questionsList');
+        if (!questionsList) {
+            console.error('❌ Questions list element not found');
+            return;
+        }
+        
         questionsList.innerHTML = '';
         
         if (questions.length === 0) {
@@ -1219,21 +1233,60 @@ document.addEventListener('DOMContentLoaded', () => {
             questionDiv.innerHTML = `
                 <div class="question-content">
                     <span class="question-number">${index + 1}.</span>
-                    <input type="text" class="question-input" value="${question}" data-index="${index}">
+                    <input type="text" class="question-input" value="${question}" data-index="${index}" placeholder="Enter question text...">
                 </div>
                 <div class="question-actions">
-                    <button class="action-btn move-up-btn" onclick="moveQuestion(${index}, 'up')" ${index === 0 ? 'disabled' : ''} title="Move Up">
+                    <button class="action-btn move-up-btn" data-index="${index}" data-direction="up" ${index === 0 ? 'disabled' : ''} title="Move Up">
                         <i class="fas fa-arrow-up"></i>
                     </button>
-                    <button class="action-btn move-down-btn" onclick="moveQuestion(${index}, 'down')" ${index === questions.length - 1 ? 'disabled' : ''} title="Move Down">
+                    <button class="action-btn move-down-btn" data-index="${index}" data-direction="down" ${index === questions.length - 1 ? 'disabled' : ''} title="Move Down">
                         <i class="fas fa-arrow-down"></i>
                     </button>
-                    <button class="action-btn delete-btn" onclick="deleteQuestion(${index})" title="Delete Question">
+                    <button class="action-btn delete-btn" data-index="${index}" title="Delete Question">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
             `;
             questionsList.appendChild(questionDiv);
+        });
+
+        // Add event listeners for the buttons
+        addQuestionEventListeners();
+    }
+
+    // Add event listeners for question actions
+    function addQuestionEventListeners() {
+        // Move up buttons
+        document.querySelectorAll('.move-up-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const index = parseInt(e.currentTarget.dataset.index);
+                moveQuestion(index, 'up');
+            });
+        });
+
+        // Move down buttons
+        document.querySelectorAll('.move-down-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const index = parseInt(e.currentTarget.dataset.index);
+                moveQuestion(index, 'down');
+            });
+        });
+
+        // Delete buttons
+        document.querySelectorAll('.delete-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const index = parseInt(e.currentTarget.dataset.index);
+                deleteQuestion(index);
+            });
+        });
+
+        // Input change listeners
+        document.querySelectorAll('.question-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const index = parseInt(e.currentTarget.dataset.index);
+                const value = e.currentTarget.value;
+                questions[index] = value;
+            });
         });
     }
 
@@ -1243,11 +1296,13 @@ document.addEventListener('DOMContentLoaded', () => {
         displayQuestions();
         
         // Focus on the new question input
-        const newQuestionInput = document.querySelector(`[data-index="${questions.length - 1}"]`);
-        if (newQuestionInput) {
-            newQuestionInput.focus();
-            newQuestionInput.select();
-        }
+        setTimeout(() => {
+            const newQuestionInput = document.querySelector(`[data-index="${questions.length - 1}"]`);
+            if (newQuestionInput) {
+                newQuestionInput.focus();
+                newQuestionInput.select();
+            }
+        }, 100);
     }
 
     // Delete question
@@ -1312,8 +1367,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Event listeners for questions management
-    document.getElementById('addQuestionBtn').addEventListener('click', addQuestion);
-    document.getElementById('saveQuestionsBtn').addEventListener('click', saveQuestions);
+    const addQuestionBtn = document.getElementById('addQuestionBtn');
+    const saveQuestionsBtn = document.getElementById('saveQuestionsBtn');
+    
+    if (addQuestionBtn) {
+        addQuestionBtn.addEventListener('click', addQuestion);
+    }
+    
+    if (saveQuestionsBtn) {
+        saveQuestionsBtn.addEventListener('click', saveQuestions);
+    }
 
     // Load questions on page load
     loadQuestions();

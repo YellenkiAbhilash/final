@@ -173,6 +173,11 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Test questions page
+app.get('/test-questions', (req, res) => {
+    res.sendFile(path.join(__dirname, 'test-questions.html'));
+});
+
 // Login endpoint
 app.post('/api/login', async (req, res) => {
     try {
@@ -818,23 +823,29 @@ callScheduler.start();
 // GET /api/questions
 app.get('/api/questions', authenticateToken, (req, res) => {
     try {
+        console.log('🔍 Questions API called by user:', req.user.email, 'role:', req.user.role);
+        
         if (req.user.role !== 'admin') {
+            console.log('❌ Access denied - user is not admin');
             return res.status(403).json({ 
                 success: false, 
                 message: 'Only admins can view questions' 
             });
         }
 
+        console.log('📁 Loading questions from file:', questionsFile);
         const questions = loadQuestions();
+        console.log('📊 Loaded questions:', questions);
+        
         res.json({ 
             success: true, 
             questions: questions 
         });
     } catch (error) {
-        console.error('Error fetching questions:', error);
+        console.error('❌ Error fetching questions:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to fetch questions' 
+            message: 'Failed to fetch questions: ' + error.message 
         });
     }
 });

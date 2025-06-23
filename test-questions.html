@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Questions API</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Questions API Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Questions Loading</h2>
+        <button onclick="testLoadQuestions()">Load Questions</button>
+        <div id="loadResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Questions Saving</h2>
+        <button onclick="testSaveQuestions()">Save Test Questions</button>
+        <div id="saveResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Current Questions</h2>
+        <div id="currentQuestions"></div>
+    </div>
+
+    <script>
+        // Test token (you'll need to replace this with a valid admin token)
+        const testToken = 'your-admin-token-here';
+        
+        async function testLoadQuestions() {
+            const resultDiv = document.getElementById('loadResult');
+            resultDiv.innerHTML = '<p class="info">Loading questions...</p>';
+            
+            try {
+                const response = await fetch('/api/questions', {
+                    headers: {
+                        'Authorization': `Bearer ${testToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Questions loaded successfully!</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    displayCurrentQuestions(data.questions);
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">❌ Failed to load questions</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <p class="error">❌ Error: ${error.message}</p>
+                `;
+            }
+        }
+        
+        async function testSaveQuestions() {
+            const resultDiv = document.getElementById('saveResult');
+            resultDiv.innerHTML = '<p class="info">Saving test questions...</p>';
+            
+            const testQuestions = [
+                "What is your full name?",
+                "How old are you?",
+                "What is your current job title?",
+                "How many years of experience do you have?"
+            ];
+            
+            try {
+                const response = await fetch('/api/questions', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${testToken}`
+                    },
+                    body: JSON.stringify({ questions: testQuestions })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Questions saved successfully!</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">❌ Failed to save questions</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <p class="error">❌ Error: ${error.message}</p>
+                `;
+            }
+        }
+        
+        function displayCurrentQuestions(questions) {
+            const div = document.getElementById('currentQuestions');
+            if (questions && questions.length > 0) {
+                div.innerHTML = `
+                    <h3>Current Questions (${questions.length}):</h3>
+                    <ol>
+                        ${questions.map(q => `<li>${q}</li>`).join('')}
+                    </ol>
+                `;
+            } else {
+                div.innerHTML = '<p class="info">No questions found.</p>';
+            }
+        }
+        
+        // Load questions on page load
+        window.onload = function() {
+            console.log('Test page loaded. Please login as admin and replace the testToken with a valid token.');
+        };
+    </script>
+</body>
+</html> 
