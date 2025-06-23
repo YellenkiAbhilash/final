@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard | Welcome</title>
+    <link rel="stylesheet" href="user-dashboard.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="dashboard-container">
+        <nav class="navbar">
+            <div class="nav-brand">
+                <i class="fas fa-shield-alt"></i>
+                <span>SecureLogin</span>
+            </div>
+            <div class="nav-user">
+                <span id="userName">User</span>
+                <span id="userCredits" class="credits-badge"></span>
+                <button id="contactAdminBtn" class="contact-admin-btn">
+                    <i class="fas fa-headset"></i>
+                    Contact Admin
+                </button>
+                <button id="logoutBtn" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                </button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="welcome-section">
+                <h1 id="welcomeMessage">Welcome, User!</h1>
+                <p>Here's a quick overview of your account.</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="card-icon" style="background: #e9d8fd;"><i class="fas fa-calendar-plus"></i></div>
+                    <h3>Scheduling Call</h3>
+                    <p>Schedule a new call</p>
+                </div>
+                <div class="stat-card">
+                    <div class="card-icon" style="background: #d1f7e8;"><i class="fas fa-calendar-check"></i></div>
+                    <h3>Scheduled Calls</h3>
+                    <p>View your scheduled calls</p>
+                </div>
+                <div class="stat-card">
+                    <div class="card-icon" style="background: #fde2e4;"><i class="fas fa-file-alt"></i></div>
+                    <h3>Report</h3>
+                    <p>View your report</p>
+                </div>
+                <div class="stat-card" id="questionsCard">
+                    <div class="card-icon" style="background: #e0e7ff;"><i class="fas fa-question-circle"></i></div>
+                    <h3>Questions</h3>
+                    <p>View and add questions</p>
+                </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="info-box" id="dashboardInfoBox">
+                <span id="infoBoxMessage">Welcome! Use the options above to manage your account.</span>
+            </div>
+
+            <!-- Questions Section -->
+            <div id="questionsSection" class="questions-section" style="display: none;">
+                <div class="questions-section-header">
+                     <h2><i class="fas fa-question-circle"></i> Frequently Asked Questions</h2>
+                </div>
+                <div class="questions-section-content">
+                    <div class="questions-list-container">
+                        <div id="questionsList" class="questions-list">
+                            <!-- Questions will be loaded here -->
+                        </div>
+                    </div>
+                    <div class="add-question-container">
+                        <h3><i class="fas fa-plus-circle"></i> Add New Question</h3>
+                        <form id="addQuestionForm">
+                            <div class="form-group">
+                                <label for="questionText">Your Question:</label>
+                                <textarea id="questionText" name="question" placeholder="Enter your question here..." required></textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Add Question</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit Question Modal -->
+    <div id="editQuestionModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-pencil-alt"></i> Edit Question</h2>
+                <span class="close" id="closeEditQuestionModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editQuestionForm">
+                    <input type="hidden" id="editQuestionId">
+                    <div class="form-group">
+                        <label for="editQuestionText">Your Question:</label>
+                        <textarea id="editQuestionText" name="question" placeholder="Enter your question here..." required></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="cancelEditQuestion" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="user-dashboard.js"></script>
+</body>
+</html> 
