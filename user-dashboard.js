@@ -664,6 +664,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Add function to render the inline scheduling form in the info box
+    function getISTDateTimeLocalString() {
+        const now = new Date();
+        // Convert to IST by adding the IST offset
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        const IST_OFFSET = 5.5 * 60 * 60000; // 5 hours 30 minutes in ms
+        const ist = new Date(utc + IST_OFFSET);
+        // Format as yyyy-MM-ddTHH:mm for datetime-local
+        const pad = n => n < 10 ? '0' + n : n;
+        return `${ist.getFullYear()}-${pad(ist.getMonth() + 1)}-${pad(ist.getDate())}T${pad(ist.getHours())}:${pad(ist.getMinutes())}`;
+    }
+
     function showScheduleCallForm() {
         const infoBox = document.getElementById('infoBoxMessage');
         infoBox.innerHTML = `
@@ -679,7 +690,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <input type="text" id="callPhone" placeholder="Enter phone number" required />
                     </div>
                     <div class="form-group">
-                        <label for="callTime">Scheduled Time:</label>
+                        <label for="callTime">Scheduled Time (IST):</label>
                         <input type="datetime-local" id="callTime" required />
                     </div>
                     <button type="submit" class="btn-primary">Schedule</button>
@@ -687,6 +698,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 </form>
             </div>
         `;
+        // Set IST min and default value
+        const callTimeInput = document.getElementById('callTime');
+        const istNow = getISTDateTimeLocalString();
+        callTimeInput.min = istNow;
+        callTimeInput.value = istNow;
         // Attach submit handler
         document.getElementById('scheduleCallForm').addEventListener('submit', async function(e) {
             e.preventDefault();
